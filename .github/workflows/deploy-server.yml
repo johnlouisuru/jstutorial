@@ -1,4 +1,4 @@
-name: Deploy Student Module to cPanel via FTP
+name: Deploy JSTutorial Module to cPanel via FTP
 
 on:
   push:
@@ -41,8 +41,8 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./student/           # Deploy only student folder
-          server-dir: /immersion/student/  # Change this to your target directory - Test 
+          # local-dir: ./           # Deploy only student folder
+          server-dir: /uruscript/  # Change this to your target directory - uruscrupt 
           exclude: |
             **/.git*
             **/.git*/**
