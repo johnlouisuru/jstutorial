@@ -56,3 +56,5 @@ jobs:
             **/tests/**
             **/.github/**
             **/README.md
+            **/deploy-server.yml
+            **/database.php

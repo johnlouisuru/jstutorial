@@ -5,6 +5,12 @@ class Database {
     private $username = "root";
     private $password = "";
     private $conn;
+
+    // private $host = "localhost";
+    // private $db_name = "bwzavjig_jstutee";
+    // private $username = "bwzavjig_jstutee";
+    // private $password = "iQHo@R@rncq&W(HE";
+    // private $conn;
     
     public function getConnection() {
         $this->conn = null;
