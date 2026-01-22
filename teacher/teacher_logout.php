@@ -7,6 +7,6 @@ $teacherSession = new TeacherSession($conn);
 
 $teacherSession->logout();
 
-header('Location: teacher_login.php');
+header('Location: teacher_login');
 exit;
 ?>

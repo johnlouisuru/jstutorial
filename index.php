@@ -1,4 +1,5 @@
 <?php
+// Test for Git Actions.
 require_once 'database.php';
 
 $db = new Database();
@@ -134,10 +135,11 @@ $studentData = $studentSession->getStudentData();
         
         .progress-ring-text {
             position: absolute;
-            top: 50%;
+            color: rgb(155, 82, 4);
+            top: 30%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 0.8rem;
+            font-size: 0.6rem;
             font-weight: bold;
         }
     </style>
@@ -181,6 +183,9 @@ $studentData = $studentSession->getStudentData();
                             <li><a class="dropdown-item" href="#" onclick="showQuizStats()">
                                 <i class="fas fa-chart-bar me-2"></i> Quiz Statistics
                             </a></li>
+                            <li><a class="dropdown-item" href="coding-ground">
+                                <i class="fas fa-code me-2"></i> Code Arena
+                            </a></li>
                             <li><a class="dropdown-item" href="#" onclick="logout()">
                                 <i class="fas fa-sign-out-alt me-2"></i> Logout
                             </a></li>
@@ -190,18 +195,19 @@ $studentData = $studentSession->getStudentData();
                 <?php else: ?>
                 <div class="dropdown">
                     <button class="btn btn-outline-primary btn-sm dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown">
-                        <i class="fas fa-user me-1"></i> Panauhin
+                        <i class="fas fa-user me-1"></i> Guest
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#loginModal">
-                            <i class="fas fa-sign-in-alt me-2"></i> Mag-Login
+                            <i class="fas fa-sign-in-alt me-2"></i> Login
                         </a></li>
                         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#registerModal">
-                            <i class="fas fa-user-plus me-2"></i> Sumali
+                            <i class="fas fa-user-plus me-2"></i> Register
                         </a></li>
+                        
                         <hr />
                         <li><a class="dropdown-item" href="teacher/teacher_login" >
-                            <i class="fas fa-sign-in-alt me-2"></i> Isang Guro
+                            <i class="fas fa-door-open me-2"></i> As Teacher
                         </a></li>
                     </ul>
                 </div>
@@ -216,8 +222,8 @@ $studentData = $studentSession->getStudentData();
             <div class="row align-items-center">
                 <div class="col-lg-8">
                     <h1 class="display-4 fw-bold mb-3">Aralin ang JavaScript sa pinaka madaling paraan.</h1>
-                    <p class="lead mb-4">Interaktibong tutorial na may mga hands-on na ehersisyo, real-time na pagpapatakbo ng code, 
-                    at pagsubaybay sa progreso. Perpekto para sa mga baguhan at may karanasan na mga developer.</p>
+                    <p class="lead mb-4">Interaktibong tutorial na may mga hands-on na mga ehersisyo, real-time na pagpapa-gana ng code, 
+                    at pagsubaybay sa progreso. Perpekto ito para sa mga baguhan at may karanasan na mga developer.</p>
                     <?php if ($studentSession->isLoggedIn()): ?>
                     <div class="alert alert-success d-inline-flex align-items-center" role="alert">
                         <i class="fas fa-check-circle me-2"></i>
@@ -227,6 +233,12 @@ $studentData = $studentSession->getStudentData();
                     <div class="alert alert-info d-inline-flex align-items-center" role="alert">
                         <i class="fas fa-info-circle me-2"></i>
                         <div><a href="#" class="alert-link" data-bs-toggle="modal" data-bs-target="#registerModal">SALI NA!</a> upang subaybayan ang iyong progreso at makakuha ng puntos!</div>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (isset($_GET['error'])): ?>
+                    <div class="alert alert-warning d-inline-flex align-items-center" role="alert">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <div>The Topic you have clicked is currently no lesson(s) uploaded.</div>
                     </div>
                     <?php endif; ?>
                 </div>
@@ -241,7 +253,7 @@ $studentData = $studentSession->getStudentData();
     <!-- Topics Grid -->
     <section class="py-5">
         <div class="container">
-            <h2 class="text-center mb-5 fw-bold">Halina at aralin ang JavaScript - JL Uru</h2>
+            <h5 class="text-center mb-5 fw-bold">"Para maintindihan mo ang isang komplikadong bagay, intidihin mo muna ang pinaka-maliit na parte nito." - <i>John Louis Uru</i></h5>
             <div class="row">
                 <?php foreach($topics as $index => $topic): 
                     // Calculate progress if logged in
@@ -292,7 +304,7 @@ $studentData = $studentSession->getStudentData();
                             </div>
                         </div>
                         <a href="lesson?topic_id=<?php echo $topic['id']; ?>" class="btn btn-primary w-100">
-                            <?php echo $progress > 0 ? 'Continue Learning' : 'Magsimula!'; ?> 
+                            <?php echo $progress > 0 ? 'Revisit Lesson!' : 'Let`s Start!'; ?> 
                             <i class="fas fa-arrow-right ms-2"></i>
                         </a>
                     </div>
@@ -428,12 +440,12 @@ $studentData = $studentSession->getStudentData();
         <div class="container">
             <div class="row">
                 <div class="col-md-6">
-                    <img src="assets/img/URUScript.png" alt="URUScript Tutorial Logo" title="URUScript Tutorial Logo" class="img-fluid" style="max-height: 50px;"> URUScript Tutorial Platform
-                    <!-- <h5><i class="fab fa-js-square me-2"></i>JavaScript Tutorial</h5> -->
-                    <p class="text-muted">An interactive learning platform for mastering JavaScript</p>
+                    <img src="assets/img/URUScript.png" alt="URUScript Tutorial Logo" title="URUScript Tutorial Logo" class="img-fluid" style="max-height: 50px;">&nbsp <a href="https://www.github.com/johnlouisuru">URUScript Tutorial Platform</a> 
+                    
+                    <p class="text-white">An interactive learning platform for mastering JavaScript</p>
                 </div>
                 <div class="col-md-6 text-md-end">
-                    <p class="text-muted mb-0">&copy; 2024 JS Tutorial. All rights reserved.</p>
+                    <p class="text-white mb-0">&copy; 2024 JS Tutorial. All rights reserved.</p>
                 </div>
             </div>
         </div>

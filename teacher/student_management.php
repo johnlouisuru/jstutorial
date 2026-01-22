@@ -399,7 +399,7 @@ function bulkImportStudents($conn, $students_data) {
                         </div>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="teacher_dashboard.php">
+                        <li><a class="dropdown-item" href="teacher_dashboard">
                             <i class="fas fa-tachometer-alt me-2"></i> Dashboard
                         </a></li>
                         <li><a class="dropdown-item" href="#">
@@ -409,7 +409,7 @@ function bulkImportStudents($conn, $students_data) {
                             <i class="fas fa-cog me-2"></i> Settings
                         </a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="teacher_logout.php">
+                        <li><a class="dropdown-item text-danger" href="teacher_logout">
                             <i class="fas fa-sign-out-alt me-2"></i> Logout
                         </a></li>
                     </ul>
@@ -427,16 +427,16 @@ function bulkImportStudents($conn, $students_data) {
                         <h5 class="mb-0">Navigation</h5>
                     </div>
                     <div class="list-group list-group-flush">
-                        <a href="teacher_dashboard.php" class="list-group-item list-group-item-action">
+                        <a href="teacher_dashboard" class="list-group-item list-group-item-action">
                             <i class="fas fa-tachometer-alt me-2"></i> Dashboard
                         </a>
-                        <a href="manage_topics.php" class="list-group-item list-group-item-action">
+                        <a href="manage_topics" class="list-group-item list-group-item-action">
                             <i class="fas fa-folder me-2"></i> Manage Topics
                         </a>
                         <a href="manage_lessons" class="list-group-item list-group-item-action">
                             <i class="fas fa-book me-2"></i> Manage Lessons
                         </a>
-                        <a href="student_management.php" class="list-group-item list-group-item-action active">
+                        <a href="student_management" class="list-group-item list-group-item-action active">
                             <i class="fas fa-users me-2"></i> Student Management
                         </a>
                         <a href="analytics" class="list-group-item list-group-item-action">

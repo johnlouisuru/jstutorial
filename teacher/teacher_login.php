@@ -111,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <input class="form-check-input" type="checkbox" name="remember" id="remember">
                         <label class="form-check-label" for="remember">Remember me</label>
                     </div>
-                    <a href="teacher_forgot_password.php" class="text-decoration-none">Forgot password?</a>
+                    <a href="teacher_forgot_password" class="text-decoration-none">Forgot password?</a>
                 </div>
                 
                 <div class="d-grid gap-2">
@@ -119,11 +119,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <i class="fas fa-sign-in-alt me-2"></i> Login
                     </button>
                     
-                    <div class="text-center mt-3">
+                    <!-- <div class="text-center mt-3">
                         <p class="mb-0">Don't have an account? 
-                            <a href="teacher_register.php" class="text-decoration-none">Register here</a>
+                            <a href="teacher_register" class="text-decoration-none">Register here</a>
                         </p>
-                    </div>
+                    </div> -->
                     <div class="text-center mt-3">
                         <p class="mb-0">Student Portal? 
                             <a href="../" class="text-decoration-none">Login as Student</a>

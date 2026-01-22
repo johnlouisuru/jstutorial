@@ -257,12 +257,19 @@ function reorderTopics($conn, $order) {
                 <h2><i class="fas fa-folder me-2 text-primary"></i>Manage Topics</h2>
                 <p class="text-muted">Organize your tutorial topics</p>
             </div>
-            <a class="btn btn-info me-2" href="manage_lessons">
-                <i class="fas fa-plus me-1"></i> Add Lessons to Topic
+            
+            
+
+            <div class="d-flex gap-2 m-1">
+
+                <a class="btn btn-info me-2" href="manage_lessons">
+                <i class="fas fa-plus me-1"></i> Add Lesson to Topic
             </a>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTopicModal">
                 <i class="fas fa-plus me-1"></i> Add Topic
             </button>
+                
+            </div>
         </div>
         
         <div class="row">

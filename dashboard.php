@@ -157,6 +157,9 @@ $stats = $studentSession->getQuizStatistics();
                             <li><a class="dropdown-item" href="#" onclick="showQuizStats()">
                                 <i class="fas fa-chart-bar me-2"></i> Quiz Statistics
                             </a></li>
+                            <li><a class="dropdown-item" href="coding-ground">
+                                <i class="fas fa-code me-2"></i> Code Arena
+                            </a></li>
                             <li><a class="dropdown-item" href="#" onclick="logout()">
                                 <i class="fas fa-sign-out-alt me-2"></i> Logout
                             </a></li>
@@ -374,12 +377,12 @@ $stats = $studentSession->getQuizStatistics();
         <div class="container">
             <div class="row">
                 <div class="col-md-6">
-                    <img src="assets/img/URUScript.png" alt="URUScript Tutorial Logo" title="URUScript Tutorial Logo" class="img-fluid" style="max-height: 50px;"> URUScript Tutorial Platform
-                    <!-- <h5><i class="fab fa-js-square me-2"></i>JavaScript Tutorial</h5> -->
-                    <p class="text-muted">An interactive learning platform for mastering JavaScript</p>
+                    <img src="assets/img/URUScript.png" alt="URUScript Tutorial Logo" title="URUScript Tutorial Logo" class="img-fluid" style="max-height: 50px;">&nbsp <a href="https://www.github.com/johnlouisuru">URUScript Tutorial Platform</a> 
+                    
+                    <p class="text-white">An interactive learning platform for mastering JavaScript</p>
                 </div>
                 <div class="col-md-6 text-md-end">
-                    <p class="text-muted mb-0">&copy; 2024 JS Tutorial. All rights reserved.</p>
+                    <p class="text-white mb-0">&copy; 2024 JS Tutorial. All rights reserved.</p>
                 </div>
             </div>
         </div>

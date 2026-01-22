@@ -1280,6 +1280,29 @@ document.addEventListener('DOMContentLoaded', function() {
         // Auto-run example code on page load
         document.addEventListener('DOMContentLoaded', runCode);
 
+         // Logout function
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                $.ajax({
+                    url: 'index.php',
+                    type: 'POST',
+                    data: { action: 'logout' },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            showToast('Logged out successfully!', 'info');
+                            setTimeout(() => {
+                                location.reload();
+                            }, 1000);
+                        }
+                    },
+                    error: function() {
+                        showToast('Error during logout. Please try again.', 'danger');
+                    }
+                });
+            }
+        }
+
          // Show quiz statistics
         function showQuizStats() {
             const modal = new bootstrap.Modal(document.getElementById('quizStatsModal'));

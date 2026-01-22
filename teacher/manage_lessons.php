@@ -464,7 +464,7 @@ function exportLessons($conn, $data) {
         
         <!-- Quick Actions -->
         <div class="quick-actions">
-            <a href="add-lesson.php" class="quick-action-btn">
+            <a href="add-lesson" class="quick-action-btn">
                 <i class="fas fa-plus-circle text-primary"></i>
                 <span class="fw-bold mt-2">Create New Lesson</span>
                 <small class="text-muted mt-1">Start from scratch</small>
@@ -691,7 +691,7 @@ function exportLessons($conn, $data) {
                             <button class="btn btn-sm btn-light" onclick="expandTopic(<?php echo $topic['id']; ?>)">
                                 <i class="fas fa-chevron-down"></i>
                             </button>
-                            <a href="add-lesson.php?topic_id=<?php echo $topic['id']; ?>" class="btn btn-sm btn-light">
+                            <a href="add-lesson?topic_id=<?php echo $topic['id']; ?>" class="btn btn-sm btn-light">
                                 <i class="fas fa-plus"></i> Add Lesson
                             </a>
                         </div>
@@ -752,11 +752,11 @@ function exportLessons($conn, $data) {
                                 </div>
                                 
                                 <div class="action-buttons">
-                                    <a href="add-lesson.php?edit=<?php echo $lesson['id']; ?>" 
+                                    <a href="add-lesson?edit=<?php echo $lesson['id']; ?>" 
                                        class="btn btn-sm btn-outline-primary" title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </a>
-                                    <a href="lesson.php?lesson_id=<?php echo $lesson['id']; ?>" 
+                                    <a href="lesson?lesson_id=<?php echo $lesson['id']; ?>" 
                                        target="_blank" class="btn btn-sm btn-outline-info" title="Preview">
                                         <i class="fas fa-eye"></i>
                                     </a>
@@ -777,7 +777,7 @@ function exportLessons($conn, $data) {
                         <div class="empty-state">
                             <i class="fas fa-book-open"></i>
                             <p class="mb-2">No lessons found for this topic</p>
-                            <a href="add-lesson.php?topic_id=<?php echo $topic['id']; ?>" class="btn btn-sm btn-primary">
+                            <a href="add-lesson?topic_id=<?php echo $topic['id']; ?>" class="btn btn-sm btn-primary">
                                 <i class="fas fa-plus me-1"></i> Create First Lesson
                             </a>
                         </div>
@@ -790,7 +790,7 @@ function exportLessons($conn, $data) {
                 <i class="fas fa-book-open fa-3x mb-3"></i>
                 <h4>No Topics Found</h4>
                 <p class="text-muted mb-3">You haven't created any topics yet</p>
-                <a href="manage_topics.php" class="btn btn-primary">
+                <a href="manage_topics" class="btn btn-primary">
                     <i class="fas fa-plus me-1"></i> Create Your First Topic
                 </a>
             </div>

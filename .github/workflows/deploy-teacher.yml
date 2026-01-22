@@ -1,0 +1,58 @@
+name: Deploy Teacher Module to cPanel via FTP
+
+on:
+  push:
+    branches:
+      - main  # Triggers on push to main branch / pwede mo palitan yang branch kung push lang without action
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    name: Deploy to cPanel
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup PHP (Optional - if you need to run build steps)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, xml, ctype, json
+          
+      # Optional: Install Composer dependencies kung kailangan
+      - name: Install Composer dependencies
+        run: |
+          if [ -f composer.json ]; then
+            composer install --no-dev --optimize-autoloader --no-interaction
+          fi
+          
+      # Optional: Run any build commands
+      - name: Build assets (if needed)
+        run: |
+          # Add your build commands here if needed
+          # npm install && npm run build
+          echo "No build steps required"
+          
+      - name: Deploy to cPanel via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./teacher/           # Deploy only teacher folder
+          server-dir: /immersion/teacher/  # Change this to your target directory - Test 
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/.env
+            vendor/**
+            **/vendor/**
+            **/db-config/**
+            **/.vscode/**
+            **/.idea/**
+            **/tests/**
+            **/.github/**
+            **/README.md

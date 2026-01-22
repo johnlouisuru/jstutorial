@@ -6,7 +6,7 @@ $conn = $db->getConnection();
 $teacherSession = new TeacherSession($conn);
 
 if (!$teacherSession->isLoggedIn()) {
-    header('Location: teacher_login.php');
+    header('Location: teacher_login');
     exit;
 }
 

@@ -7,7 +7,7 @@ $teacherSession = new TeacherSession($conn);
 
 // Check if teacher is logged in
 if (!$teacherSession->isLoggedIn()) {
-    header('Location: teacher_login.php');
+    header('Location: teacher_login');
     exit;
 }
 
@@ -674,23 +674,23 @@ $students = $conn->query($students_query)->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="teacher_dashboard.php">
+                        <li><a class="dropdown-item" href="teacher_dashboard">
                             <i class="fas fa-tachometer-alt me-2"></i> Dashboard
                         </a></li>
-                        <li><a class="dropdown-item" href="manage_topics.php">
+                        <li><a class="dropdown-item" href="manage_topics">
                             <i class="fas fa-folder me-2"></i> Manage Topics
                         </a></li>
-                        <li><a class="dropdown-item" href="student_management.php">
+                        <li><a class="dropdown-item" href="student_management">
                             <i class="fas fa-users me-2"></i> Student Management
                         </a></li>
-                        <li><a class="dropdown-item active" href="reports.php">
+                        <li><a class="dropdown-item active" href="reports">
                             <i class="fas fa-chart-bar me-2"></i> Reports
                         </a></li>
-                        <li><a class="dropdown-item" href="analytics.php">
+                        <li><a class="dropdown-item" href="analytics">
                             <i class="fas fa-chart-line me-2"></i> Analytics
                         </a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="teacher_logout.php">
+                        <li><a class="dropdown-item text-danger" href="teacher_logout">
                             <i class="fas fa-sign-out-alt me-2"></i> Logout
                         </a></li>
                     </ul>
@@ -729,25 +729,25 @@ $students = $conn->query($students_query)->fetchAll(PDO::FETCH_ASSOC);
                 <ul class="nav nav-tabs nav-fill" id="reportTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <a class="nav-link <?php echo $report_type == 'overview' ? 'active' : ''; ?>" 
-                           href="reports.php?report_type=overview&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>">
+                           href="reports?report_type=overview&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>">
                             <i class="fas fa-tachometer-alt me-2"></i> Overview
                         </a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link <?php echo $report_type == 'student_progress' ? 'active' : ''; ?>" 
-                           href="reports.php?report_type=student_progress&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>">
+                           href="reports?report_type=student_progress&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>">
                             <i class="fas fa-user-graduate me-2"></i> Student Progress
                         </a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link <?php echo $report_type == 'quiz_analytics' ? 'active' : ''; ?>" 
-                           href="reports.php?report_type=quiz_analytics&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>">
+                           href="reports?report_type=quiz_analytics&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>">
                             <i class="fas fa-question-circle me-2"></i> Quiz Analytics
                         </a>
                     </li>
                     <li class="nav-item" role="presentation">
                         <a class="nav-link <?php echo $report_type == 'engagement' ? 'active' : ''; ?>" 
-                           href="reports.php?report_type=engagement&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>">
+                           href="reports?report_type=engagement&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>">
                             <i class="fas fa-chart-line me-2"></i> Engagement
                         </a>
                     </li>
@@ -1075,7 +1075,7 @@ $students = $conn->query($students_query)->fetchAll(PDO::FETCH_ASSOC);
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <a href="reports.php?report_type=student_detail&student_id=<?php echo $student['id']; ?>&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>" 
+                                    <a href="reports?report_type=student_detail&student_id=<?php echo $student['id']; ?>&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>" 
                                        class="btn btn-sm btn-outline-primary">
                                         <i class="fas fa-chart-line"></i> Details
                                     </a>

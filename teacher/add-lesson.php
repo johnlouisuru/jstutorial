@@ -580,37 +580,37 @@ function uploadImage() {
             
             <div class="sidebar-nav">
                 <div class="nav-item">
-                    <a href="add-lesson.php" class="nav-link active">
+                    <a href="add-lesson" class="nav-link active">
                         <i class="fas fa-plus-circle"></i>
                         <span>Create Lesson</span>
                     </a>
                 </div>
                 <div class="nav-item">
-                    <a href="manage_lessons.php" class="nav-link">
+                    <a href="manage_lessons" class="nav-link">
                         <i class="fas fa-list"></i>
                         <span>Manage Lessons</span>
                     </a>
                 </div>
                 <div class="nav-item">
-                    <a href="manage_quizzes.php" class="nav-link">
+                    <a href="manage_quizzes" class="nav-link">
                         <i class="fas fa-question-circle"></i>
                         <span>Manage Quizzes</span>
                     </a>
                 </div>
                 <div class="nav-item">
-                    <a href="manage_topics.php" class="nav-link">
+                    <a href="manage_topics" class="nav-link">
                         <i class="fas fa-book"></i>
                         <span>Manage Topics</span>
                     </a>
                 </div>
                 <div class="nav-item">
-                    <a href="analytics.php" class="nav-link">
+                    <a href="analytics" class="nav-link">
                         <i class="fas fa-chart-bar"></i>
                         <span>Reports</span>
                     </a>
                 </div>
                 <div class="nav-item">
-                    <a href="index.php" class="nav-link">
+                    <a href="teacher_dashboard" class="nav-link">
                         <i class="fas fa-home"></i>
                         <span>Back to Site</span>
                     </a>

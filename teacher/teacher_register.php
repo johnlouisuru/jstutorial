@@ -7,7 +7,7 @@ $teacherSession = new TeacherSession($conn);
 
 // Redirect if already logged in
 if ($teacherSession->isLoggedIn()) {
-    header('Location: teacher_dashboard.php');
+    header('Location: teacher_dashboard');
     exit;
 }
 
@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = $teacherSession->register($username, $email, $password);
             
             if ($result['success']) {
-                header('Location: teacher_dashboard.php');
+                header('Location: teacher_dashboard');
                 exit;
             } else {
                 $error = $result['message'];
@@ -169,7 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     <div class="text-center mt-3">
                         <p class="mb-0">Already have an account? 
-                            <a href="teacher_login.php" class="text-decoration-none">Login here</a>
+                            <a href="teacher_login" class="text-decoration-none">Login here</a>
                         </p>
                     </div>
                     <div class="text-center mt-3">

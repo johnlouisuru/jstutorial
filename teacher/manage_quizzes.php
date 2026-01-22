@@ -45,11 +45,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Get filter parameters with proper type casting
-$topic_id = isset($_GET['topic_id']) && $_GET['topic_id'] !== 'all' ? (int)$_GET['topic_id'] : 'all';
-$difficulty = $_GET['difficulty'] ?? 'all';
-$has_explanation = $_GET['has_explanation'] ?? 'all';
-$search = $_GET['search'] ?? '';
+// Get filter parameters with proper type casting and default values
+$topic_id = isset($_GET['topic_id']) && $_GET['topic_id'] !== '' && $_GET['topic_id'] !== 'all' 
+    ? (int)$_GET['topic_id'] 
+    : 'all';
+$difficulty = isset($_GET['difficulty']) && $_GET['difficulty'] !== '' ? $_GET['difficulty'] : 'all';
+$has_explanation = isset($_GET['has_explanation']) && $_GET['has_explanation'] !== '' ? $_GET['has_explanation'] : 'all';
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $per_page = 20;
 
@@ -72,42 +74,64 @@ $count_query = "SELECT COUNT(*) as total FROM quizzes q
                 WHERE q.deleted_at IS NULL AND l.deleted_at IS NULL AND t.deleted_at IS NULL";
 
 $params = [];
+$param_types = [];
 $conditions = [];
 
 // Apply filters
 if ($topic_id !== 'all') {
     $conditions[] = "t.id = ?";
     $params[] = $topic_id;
+    $param_types[] = PDO::PARAM_INT;
 }
 
 if ($difficulty !== 'all') {
     $conditions[] = "q.difficulty = ?";
     $params[] = $difficulty;
+    $param_types[] = PDO::PARAM_STR;
 }
 
 if ($has_explanation !== 'all') {
     if ($has_explanation === 'yes') {
-        $conditions[] = "q.explanation IS NOT NULL AND q.explanation != ''";
+        $conditions[] = "(q.explanation IS NOT NULL AND q.explanation != '')";
     } else {
         $conditions[] = "(q.explanation IS NULL OR q.explanation = '')";
     }
+    // No parameters to bind for this condition
 }
 
-if ($search) {
-    $conditions[] = "(q.question LIKE ? OR l.lesson_title LIKE ?)";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
+if ($search !== '') {
+    $conditions[] = "(q.question LIKE ? OR l.lesson_title LIKE ? OR t.topic_name LIKE ?)";
+    $searchTerm = "%$search%";
+    $params[] = $searchTerm;
+    $params[] = $searchTerm;
+    $params[] = $searchTerm;
+    $param_types[] = PDO::PARAM_STR;
+    $param_types[] = PDO::PARAM_STR;
+    $param_types[] = PDO::PARAM_STR;
 }
 
+// Add conditions to queries
 if (!empty($conditions)) {
     $query .= " AND " . implode(" AND ", $conditions);
     $count_query .= " AND " . implode(" AND ", $conditions);
 }
 
 // Get total count for pagination
-$stmt = $conn->prepare($count_query);
-$stmt->execute($params);
-$total_count = (int)$stmt->fetch(PDO::FETCH_ASSOC)['total'];
+try {
+    $stmt = $conn->prepare($count_query);
+    if (!empty($params)) {
+        foreach ($params as $index => $value) {
+            $stmt->bindValue($index + 1, $value, $param_types[$index] ?? PDO::PARAM_STR);
+        }
+    }
+    $stmt->execute();
+    $count_result = $stmt->fetch(PDO::FETCH_ASSOC);
+    $total_count = (int)($count_result['total'] ?? 0);
+} catch (PDOException $e) {
+    error_log("Count query error: " . $e->getMessage());
+    $total_count = 0;
+}
+
 $total_pages = ceil($total_count / $per_page);
 
 // Ensure page doesn't exceed total pages
@@ -118,41 +142,67 @@ if ($page > $total_pages && $total_pages > 0) {
 // Calculate offset
 $offset = ($page - 1) * $per_page;
 
-// Add ordering and pagination - use named parameters for clarity
-$query .= " ORDER BY q.created_at DESC LIMIT :limit OFFSET :offset";
+// Add ordering and pagination - use question mark placeholders for all parameters
+$query .= " ORDER BY q.created_at DESC LIMIT ? OFFSET ?";
 
-// Prepare the statement
-$stmt = $conn->prepare($query);
+// Add LIMIT and OFFSET parameters
+$params[] = $per_page;
+$param_types[] = PDO::PARAM_INT;
+$params[] = $offset;
+$param_types[] = PDO::PARAM_INT;
 
-// Bind all the filter parameters
-foreach ($params as $index => $value) {
-    $stmt->bindValue($index + 1, $value);
+// Prepare and execute the main query
+try {
+    $stmt = $conn->prepare($query);
+    
+    // Bind all parameters
+    foreach ($params as $index => $value) {
+        $stmt->bindValue($index + 1, $value, $param_types[$index] ?? PDO::PARAM_STR);
+    }
+    
+    $stmt->execute();
+    $quizzes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log("Main query error: " . $e->getMessage());
+    $quizzes = [];
 }
 
-// Now bind the LIMIT parameters with integer type
-$stmt->bindValue(':limit', (int)$per_page, PDO::PARAM_INT);
-$stmt->bindValue(':offset', (int)$offset, PDO::PARAM_INT);
-
-$stmt->execute();
-$quizzes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
 // Fetch topics for filter dropdown
-$topics_query = "SELECT id, topic_name FROM topics WHERE is_active = 1 AND deleted_at IS NULL ORDER BY topic_order";
-$topics = $conn->query($topics_query)->fetchAll(PDO::FETCH_ASSOC);
+try {
+    $topics_query = "SELECT id, topic_name FROM topics WHERE is_active = 1 AND deleted_at IS NULL ORDER BY topic_order";
+    $topics = $conn->query($topics_query)->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log("Topics query error: " . $e->getMessage());
+    $topics = [];
+}
 
 // Get overall quiz statistics
-$stats_query = "SELECT 
-                COUNT(*) as total_quizzes,
-                SUM(CASE WHEN difficulty = 'easy' THEN 1 ELSE 0 END) as easy_count,
-                SUM(CASE WHEN difficulty = 'medium' THEN 1 ELSE 0 END) as medium_count,
-                SUM(CASE WHEN difficulty = 'hard' THEN 1 ELSE 0 END) as hard_count,
-                COUNT(DISTINCT lesson_id) as lessons_with_quizzes,
-                AVG((SELECT COUNT(*) FROM quiz_options o WHERE o.quiz_id = q.id)) as avg_options,
-                (SELECT COUNT(*) FROM student_quiz_attempts) as total_attempts,
-                (SELECT COUNT(*) FROM student_quiz_attempts WHERE is_correct = 1) as correct_attempts
-                FROM quizzes q
-                WHERE q.deleted_at IS NULL";
-$stats = $conn->query($stats_query)->fetch(PDO::FETCH_ASSOC);
+try {
+    $stats_query = "SELECT 
+                    COUNT(*) as total_quizzes,
+                    SUM(CASE WHEN difficulty = 'easy' THEN 1 ELSE 0 END) as easy_count,
+                    SUM(CASE WHEN difficulty = 'medium' THEN 1 ELSE 0 END) as medium_count,
+                    SUM(CASE WHEN difficulty = 'hard' THEN 1 ELSE 0 END) as hard_count,
+                    COUNT(DISTINCT lesson_id) as lessons_with_quizzes,
+                    AVG((SELECT COUNT(*) FROM quiz_options o WHERE o.quiz_id = q.id)) as avg_options,
+                    (SELECT COUNT(*) FROM student_quiz_attempts) as total_attempts,
+                    (SELECT COUNT(*) FROM student_quiz_attempts WHERE is_correct = 1) as correct_attempts
+                    FROM quizzes q
+                    WHERE q.deleted_at IS NULL";
+    $stats = $conn->query($stats_query)->fetch(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log("Stats query error: " . $e->getMessage());
+    $stats = [
+        'total_quizzes' => 0,
+        'easy_count' => 0,
+        'medium_count' => 0,
+        'hard_count' => 0,
+        'lessons_with_quizzes' => 0,
+        'avg_options' => 0,
+        'total_attempts' => 0,
+        'correct_attempts' => 0
+    ];
+}
 
 // Calculate accuracy rate
 if ($stats && $stats['total_attempts'] > 0) {
@@ -732,7 +782,7 @@ function exportQuizzes($conn, $data) {
         
         <!-- Quick Actions -->
         <div class="quick-actions">
-            <a href="add-lesson.php" class="quick-action-btn">
+            <a href="add-lesson" class="quick-action-btn">
                 <i class="fas fa-plus-circle text-primary"></i>
                 <span class="fw-bold mt-2">Create New Quiz</span>
                 <small class="text-muted mt-1">Add to existing lesson</small>
@@ -844,52 +894,61 @@ function exportQuizzes($conn, $data) {
             </div>
         </div>
         
-        <!-- Filter Bar -->
-        <div class="filter-bar">
-            <form id="filterForm" method="GET" class="row g-3 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label">Topic</label>
-                    <select class="form-select" name="topic_id" onchange="this.form.submit()">
-                        <option value="all">All Topics</option>
-                        <?php foreach($topics as $topic): ?>
-                        <option value="<?php echo $topic['id']; ?>" <?php echo $topic_id == $topic['id'] ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($topic['topic_name']); ?>
-                        </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">Difficulty</label>
-                    <select class="form-select" name="difficulty" onchange="this.form.submit()">
-                        <option value="all" <?php echo $difficulty == 'all' ? 'selected' : ''; ?>>All Levels</option>
-                        <option value="easy" <?php echo $difficulty == 'easy' ? 'selected' : ''; ?>>Easy</option>
-                        <option value="medium" <?php echo $difficulty == 'medium' ? 'selected' : ''; ?>>Medium</option>
-                        <option value="hard" <?php echo $difficulty == 'hard' ? 'selected' : ''; ?>>Hard</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">Explanation</label>
-                    <select class="form-select" name="has_explanation" onchange="this.form.submit()">
-                        <option value="all" <?php echo $has_explanation == 'all' ? 'selected' : ''; ?>>All</option>
-                        <option value="yes" <?php echo $has_explanation == 'yes' ? 'selected' : ''; ?>>With Explanation</option>
-                        <option value="no" <?php echo $has_explanation == 'no' ? 'selected' : ''; ?>>Without Explanation</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Search</label>
-                    <div class="search-box">
-                        <i class="fas fa-search"></i>
-                        <input type="text" class="form-control" name="search" placeholder="Search questions..." 
-                               value="<?php echo htmlspecialchars($search); ?>">
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-filter me-1"></i> Filter
-                    </button>
-                </div>
-            </form>
+       <!-- Filter Bar -->
+<div class="filter-bar">
+    <form id="filterForm" method="GET" class="row g-3 align-items-end">
+        <input type="hidden" name="page" value="1"> <!-- Reset to page 1 on filter -->
+        
+        <div class="col-md-3">
+            <label class="form-label">Topic</label>
+            <select class="form-select" name="topic_id" id="topicFilter">
+                <option value="all">All Topics</option>
+                <?php foreach($topics as $topic): ?>
+                <option value="<?php echo $topic['id']; ?>" 
+                    <?php echo $topic_id == $topic['id'] ? 'selected' : ''; ?>>
+                    <?php echo htmlspecialchars($topic['topic_name']); ?>
+                </option>
+                <?php endforeach; ?>
+            </select>
         </div>
+        <div class="col-md-2">
+            <label class="form-label">Difficulty</label>
+            <select class="form-select" name="difficulty" id="difficultyFilter">
+                <option value="all" <?php echo $difficulty == 'all' ? 'selected' : ''; ?>>All Levels</option>
+                <option value="easy" <?php echo $difficulty == 'easy' ? 'selected' : ''; ?>>Easy</option>
+                <option value="medium" <?php echo $difficulty == 'medium' ? 'selected' : ''; ?>>Medium</option>
+                <option value="hard" <?php echo $difficulty == 'hard' ? 'selected' : ''; ?>>Hard</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Explanation</label>
+            <select class="form-select" name="has_explanation" id="explanationFilter">
+                <option value="all" <?php echo $has_explanation == 'all' ? 'selected' : ''; ?>>All</option>
+                <option value="yes" <?php echo $has_explanation == 'yes' ? 'selected' : ''; ?>>With Explanation</option>
+                <option value="no" <?php echo $has_explanation == 'no' ? 'selected' : ''; ?>>Without Explanation</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Search</label>
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" class="form-control" name="search" id="searchFilter" 
+                       placeholder="Search questions..." 
+                       value="<?php echo htmlspecialchars($search); ?>">
+            </div>
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="fas fa-filter me-1"></i> Filter
+            </button>
+            <?php if ($topic_id !== 'all' || $difficulty !== 'all' || $has_explanation !== 'all' || $search !== ''): ?>
+            <a href="manage_quizzes" class="btn btn-outline-secondary w-100 mt-2">
+                <i class="fas fa-times me-1"></i> Clear
+            </a>
+            <?php endif; ?>
+        </div>
+    </form>
+</div>
         
         <!-- Bulk Actions Bar -->
         <div class="bulk-actions-bar" id="bulkActionsBar">
@@ -997,7 +1056,7 @@ function exportQuizzes($conn, $data) {
                             <i class="fas fa-plus me-1"></i> Create First Quiz
                         </button>
                         <?php if ($topic_id !== 'all' || $difficulty !== 'all' || $search): ?>
-                        <a href="manage_quizzes.php" class="btn btn-outline-secondary">
+                        <a href="manage_quizzes" class="btn btn-outline-secondary">
                             <i class="fas fa-times me-1"></i> Clear Filters
                         </a>
                         <?php endif; ?>
@@ -1192,7 +1251,7 @@ function exportQuizzes($conn, $data) {
                         To add a quiz, please go to the specific lesson or use the "Create New Quiz" button above.
                     </div>
                     <div class="text-center py-4">
-                        <a href="add-lesson.php" class="btn btn-primary">
+                        <a href="add-lesson" class="btn btn-primary">
                             <i class="fas fa-plus-circle me-1"></i> Go to Lesson Creator
                         </a>
                     </div>
@@ -1386,7 +1445,7 @@ function exportQuizzes($conn, $data) {
                                 <i class="fas fa-trash me-1"></i> Delete Quiz
                             </button>
                         </div>
-                        <a href="lesson.php?lesson_id=${quiz.lesson_id}" target="_blank" class="btn btn-sm btn-outline-info">
+                        <a href="lesson?lesson_id=${quiz.lesson_id}" target="_blank" class="btn btn-sm btn-outline-info">
                             <i class="fas fa-external-link-alt me-1"></i> View Lesson
                         </a>
                     </div>
@@ -1961,6 +2020,47 @@ function getDifficultyColor(difficulty) {
         default: return '#6c757d';
     }
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-submit filters when dropdowns change
+    const autoSubmitFilters = ['topicFilter', 'difficultyFilter', 'explanationFilter'];
+    
+    autoSubmitFilters.forEach(filterId => {
+        const element = document.getElementById(filterId);
+        if (element) {
+            element.addEventListener('change', function() {
+                document.getElementById('filterForm').submit();
+            });
+        }
+    });
+    
+    // Debounced search
+    let searchTimeout;
+    const searchInput = document.getElementById('searchFilter');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                document.getElementById('filterForm').submit();
+            }, 500);
+        });
+    }
+    
+    // Preserve filters in pagination links
+    document.querySelectorAll('.pagination a').forEach(link => {
+        const url = new URL(link.href);
+        const currentParams = new URLSearchParams(window.location.search);
+        
+        // Preserve filter parameters
+        ['topic_id', 'difficulty', 'has_explanation', 'search'].forEach(param => {
+            if (currentParams.has(param) && !url.searchParams.has(param)) {
+                url.searchParams.set(param, currentParams.get(param));
+            }
+        });
+        
+        link.href = url.toString();
+    });
+});
         
         // Render analytics chart
 function renderAnalyticsChart(analytics) {
