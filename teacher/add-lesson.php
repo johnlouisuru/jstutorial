@@ -34,6 +34,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'delete_lesson':
                 $response = deleteLesson($conn, $_POST['lesson_id']);
                 break;
+            case 'delete_image':
+                $response = deleteImage($conn, $_POST['image_id']);
+                break;
+            case 'update_image_alt':
+                $response = updateImageAlt($conn, $_POST['image_id'], $_POST['alt_text']);
+                break;
+            case 'get_lesson_images':
+                $response = getLessonImages($conn, $_POST['lesson_id']);
+                break;
+            case 'cleanup_images':
+                $deleted_count = cleanupUnusedImages($conn);
+                $response = ['success' => true, 'deleted_count' => $deleted_count];
+                break;
         }
         
         header('Content-Type: application/json');
@@ -81,7 +94,18 @@ function saveLesson($conn, $data) {
         
         $stmt->execute();
         
+        // In saveLesson() function, after saving:
         $lesson_id = isset($data['lesson_id']) && $data['lesson_id'] ? $data['lesson_id'] : $conn->lastInsertId();
+
+        // Clean up unused images for this lesson
+        cleanupUnusedImages($conn);
+
+        // Also, update lesson_id for orphaned images
+        $update_query = "UPDATE lesson_images SET lesson_id = :lesson_id 
+                        WHERE lesson_id IS NULL OR lesson_id = ''";
+        $update_stmt = $conn->prepare($update_query);
+        $update_stmt->bindParam(':lesson_id', $lesson_id);
+        $update_stmt->execute();
         
         $conn->commit();
         
@@ -257,13 +281,25 @@ function deleteLesson($conn, $lesson_id) {
     }
 }
 
+// Add this helper function at the top of your file
+function getBaseUrl() {
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+    $host = $_SERVER['HTTP_HOST'];
+    $script_path = dirname($_SERVER['SCRIPT_NAME']);
+    
+    // Remove the filename if present
+    $script_path = str_replace(basename($_SERVER['SCRIPT_NAME']), '', $script_path);
+    
+    return rtrim($protocol . $host . $script_path, '/');
+}
+// Function to upload image
 // Function to upload image
 function uploadImage() {
     if (!isset($_FILES['image']) || $_FILES['image']['error'] !== UPLOAD_ERR_OK) {
         return ['success' => false, 'message' => 'No file uploaded or upload error'];
     }
     
-    $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml'];
+    $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml', 'image/jpg'];
     $max_size = 5 * 1024 * 1024; // 5MB
     
     $file_type = $_FILES['image']['type'];
@@ -277,6 +313,9 @@ function uploadImage() {
         return ['success' => false, 'message' => 'File too large. Maximum size: 5MB'];
     }
     
+    // Get lesson ID if available
+    $lesson_id = isset($_POST['lesson_id']) ? $_POST['lesson_id'] : null;
+    
     // Create uploads directory if it doesn't exist
     $upload_dir = 'uploads/lessons/';
     if (!file_exists($upload_dir)) {
@@ -284,19 +323,142 @@ function uploadImage() {
     }
     
     // Generate unique filename
-    $file_ext = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
+    $file_ext = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
     $filename = uniqid('lesson_', true) . '.' . $file_ext;
     $filepath = $upload_dir . $filename;
     
     if (move_uploaded_file($_FILES['image']['tmp_name'], $filepath)) {
+        // Get alt text if provided
+        $alt_text = isset($_POST['alt_text']) ? $_POST['alt_text'] : '';
+        
+        // Save to database
+        // $conn = Database::getInstance()->getConnection();
+        $db = new Database();
+        $conn = $db->getConnection();
+        $query = "INSERT INTO lesson_images (lesson_id, filename, filepath, alt_text) 
+                  VALUES (:lesson_id, :filename, :filepath, :alt_text)";
+        $stmt = $conn->prepare($query);
+        $stmt->bindParam(':lesson_id', $lesson_id);
+        $stmt->bindParam(':filename', $filename);
+        $stmt->bindParam(':filepath', $filepath);
+        $stmt->bindParam(':alt_text', $alt_text);
+        $stmt->execute();
+        
+        $image_id = $conn->lastInsertId();
+        
+        // Calculate URL
+        $script_path = dirname($_SERVER['SCRIPT_NAME']);
+        $relative_url = rtrim($script_path, '/') . '/' . $filepath;
+        
         return [
             'success' => true,
-            'url' => $filepath,
-            'filename' => $filename
+            'image_id' => $image_id,
+            'url' => $relative_url,
+            'filename' => $filename,
+            'filepath' => $filepath,
+            'alt_text' => $alt_text,
+            'debug' => [
+                'script_name' => $_SERVER['SCRIPT_NAME'],
+                'document_root' => $_SERVER['DOCUMENT_ROOT'],
+                'current_dir' => dirname($_SERVER['SCRIPT_NAME'])
+            ]
         ];
     }
     
     return ['success' => false, 'message' => 'Failed to upload file'];
+}
+
+// Function to delete unused images
+function cleanupUnusedImages($conn) {
+    try {
+        // Find images not referenced in any lesson content
+        $query = "SELECT li.id, li.filepath FROM lesson_images li 
+                  LEFT JOIN lessons l ON li.lesson_id = l.id 
+                  WHERE l.id IS NULL 
+                  OR (l.lesson_content NOT LIKE CONCAT('%', li.filename, '%') 
+                      AND l.lesson_content NOT LIKE CONCAT('%', li.filepath, '%'))";
+        $stmt = $conn->query($query);
+        $unused_images = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        foreach ($unused_images as $image) {
+            // Delete from filesystem
+            if (file_exists($image['filepath'])) {
+                unlink($image['filepath']);
+            }
+            
+            // Delete from database
+            $delete_query = "DELETE FROM lesson_images WHERE id = :id";
+            $delete_stmt = $conn->prepare($delete_query);
+            $delete_stmt->bindParam(':id', $image['id']);
+            $delete_stmt->execute();
+        }
+        
+        return count($unused_images);
+    } catch (PDOException $e) {
+        error_log('Cleanup error: ' . $e->getMessage());
+        return 0;
+    }
+}
+
+// Function to delete specific image
+function deleteImage($conn, $image_id) {
+    try {
+        // Get image info
+        $query = "SELECT filepath FROM lesson_images WHERE id = :id";
+        $stmt = $conn->prepare($query);
+        $stmt->bindParam(':id', $image_id);
+        $stmt->execute();
+        $image = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($image) {
+            // Delete from filesystem
+            if (file_exists($image['filepath'])) {
+                unlink($image['filepath']);
+            }
+            
+            // Delete from database
+            $delete_query = "DELETE FROM lesson_images WHERE id = :id";
+            $delete_stmt = $conn->prepare($delete_query);
+            $delete_stmt->bindParam(':id', $image_id);
+            $delete_stmt->execute();
+            
+            return ['success' => true, 'message' => 'Image deleted'];
+        }
+        
+        return ['success' => false, 'message' => 'Image not found'];
+    } catch (PDOException $e) {
+        return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+    }
+}
+
+// Function to update image alt text
+function updateImageAlt($conn, $image_id, $alt_text) {
+    try {
+        $query = "UPDATE lesson_images SET alt_text = :alt_text WHERE id = :id";
+        $stmt = $conn->prepare($query);
+        $stmt->bindParam(':id', $image_id);
+        $stmt->bindParam(':alt_text', $alt_text);
+        $stmt->execute();
+        
+        return ['success' => true, 'message' => 'Alt text updated'];
+    } catch (PDOException $e) {
+        return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+    }
+}
+
+// Function to get lesson images
+function getLessonImages($conn, $lesson_id) {
+    try {
+        $query = "SELECT * FROM lesson_images WHERE lesson_id = :lesson_id ORDER BY uploaded_at DESC";
+        $stmt = $conn->prepare($query);
+        $stmt->bindParam(':lesson_id', $lesson_id);
+        $stmt->execute();
+        $images = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        return ['success' => true, 'images' => $images];
+    } catch (PDOException $e) {
+        return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -522,15 +684,7 @@ function uploadImage() {
             overflow-x: auto;
         }
         
-        .image-upload-preview {
-            max-width: 200px;
-            max-height: 200px;
-            border: 2px dashed #dee2e6;
-            border-radius: 5px;
-            padding: 10px;
-            margin: 10px 0;
-            display: none;
-        }
+        
         
         @media (max-width: 768px) {
             .admin-layout {
@@ -565,6 +719,115 @@ function uploadImage() {
                 font-size: 0.9rem;
             }
         }
+
+.image-container {
+    position: relative;
+    margin: 10px 0;
+    display: inline-block;
+    max-width: 100%;
+}
+
+.image-wrapper {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+}
+
+/* Floating buttons on top-right corner */
+.image-controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    gap: 5px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 10;
+}
+
+.image-container:hover .image-controls {
+    opacity: 1;
+}
+
+.image-control-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: transform 0.2s;
+}
+
+.image-control-btn:hover {
+    transform: scale(1.1);
+}
+
+.image-control-btn.delete {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.image-control-btn.edit {
+    background-color: #3498db;
+    color: white;
+}
+
+.image-control-btn.replace {
+    background-color: #2ecc71;
+    color: white;
+}
+
+/* Overlay style for editing */
+.image-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.image-container:hover .image-overlay {
+    opacity: 1;
+}
+
+.image-options {
+    display: flex;
+    gap: 10px;
+}
+
+.uploading-indicator {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 255, 255, 0.9);
+    padding: 5px 10px;
+    border-radius: 3px;
+    z-index: 10;
+}
+
+/* Style for images in editor */
+.editable-image {
+    max-width: 100%;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.editable-image:hover {
+    outline: 2px solid #4361ee;
+}
     </style>
 </head>
 <body>
@@ -882,6 +1145,9 @@ function uploadImage() {
                             <button class="btn btn-outline-danger" onclick="clearForm()">
                                 <i class="fas fa-trash me-1"></i> Clear Form
                             </button>
+                            <button class="btn btn-outline-warning" onclick="cleanupUnusedImages()">
+    <i class="fas fa-broom me-1"></i> Cleanup Unused Images
+</button>
                         </div>
                     </div>
                     
@@ -1050,62 +1316,485 @@ console.log('Hello, World!');</code></pre>
             updateContent();
         }
         
-        // Upload image
-        function uploadImage() {
-            const modal = new bootstrap.Modal(document.getElementById('imageUploadModal'));
-            modal.show();
-            
-            // Preview image
-            document.getElementById('imageFile').addEventListener('change', function(e) {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        const preview = document.getElementById('imagePreview');
-                        preview.src = e.target.result;
-                        preview.style.display = 'block';
-                    };
-                    reader.readAsDataURL(file);
-                }
-            });
-        }
-        
-        // Insert image
-        function insertImage() {
-            const fileInput = document.getElementById('imageFile');
-            const altText = document.getElementById('imageAlt').value || 'Image';
-            
-            if (fileInput.files.length === 0) {
-                alert('Please select an image first');
+        // Upload image - Modified for immediate preview
+function uploadImage() {
+    const modal = new bootstrap.Modal(document.getElementById('imageUploadModal'));
+    modal.show();
+    
+    // Preview image in modal
+    const fileInput = document.getElementById('imageFile');
+    const preview = document.getElementById('imagePreview');
+    
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file type client-side
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml'];
+            if (!allowedTypes.includes(file.type)) {
+                alert('Invalid file type. Allowed: JPEG, PNG, GIF, SVG');
+                fileInput.value = '';
+                preview.style.display = 'none';
                 return;
             }
             
-            const formData = new FormData();
-            formData.append('action', 'upload_image');
-            formData.append('image', fileInput.files[0]);
+            // Validate file size client-side (5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File too large. Maximum size: 5MB');
+                fileInput.value = '';
+                preview.style.display = 'none';
+                return;
+            }
             
-            fetch('add-lesson.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const img = `<img src="${data.url}" alt="${altText}" class="img-fluid rounded mb-3" style="max-width: 100%;">`;
-                    insertHTML(img);
-                    
-                    // Reset modal
-                    document.getElementById('imageFile').value = '';
-                    document.getElementById('imageAlt').value = '';
-                    document.getElementById('imagePreview').style.display = 'none';
-                    
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('imageUploadModal'));
-                    modal.hide();
-                } else {
-                    alert('Error: ' + data.message);
-                }
-            });
+            // Create preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+                
+                // OPTIONAL: Auto-insert image after preview
+                // You can uncomment this for immediate insertion
+                setTimeout(() => {
+                    insertImage();
+                }, 500);
+            };
+            reader.readAsDataURL(file);
         }
+    });
+    
+    // Clear previous file on modal open
+    fileInput.value = '';
+    document.getElementById('imageAlt').value = '';
+    preview.style.display = 'none';
+}
+        
+   // Insert image with floating control buttons
+function insertImage() {
+    const fileInput = document.getElementById('imageFile');
+    const altText = document.getElementById('imageAlt').value || '';
+    
+    if (fileInput.files.length === 0) {
+        showToast('Please select an image first', 'warning');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('action', 'upload_image');
+    formData.append('image', fileInput.files[0]);
+    formData.append('alt_text', altText);
+    
+    // Get current lesson ID if available
+    if (currentLessonId) {
+        formData.append('lesson_id', currentLessonId);
+    }
+    
+    // Show uploading indicator
+    const tempUrl = URL.createObjectURL(fileInput.files[0]);
+    const imageId = 'img-' + Date.now();
+    
+    // Create image with floating control buttons
+    const imageHtml = `
+        <div class="image-container" id="${imageId}" data-temp="true">
+            <div class="image-wrapper">
+                <img src="${tempUrl}" alt="${altText}" class="img-fluid rounded editable-image">
+                
+                <!-- Floating control buttons -->
+                <div class="image-controls">
+                    <button class="image-control-btn delete" onclick="removeImage('${imageId}')" title="Delete">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <button class="image-control-btn edit" onclick="editImageProperties('${imageId}')" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="image-control-btn replace" onclick="replaceImage('${imageId}')" title="Replace">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                
+                <!-- Overlay for click-to-edit (optional) -->
+                <div class="image-overlay" onclick="showImageOptions('${imageId}')">
+                    <div class="image-options">
+                        <button class="btn btn-sm btn-outline-light me-1" onclick="editImageProperties('${imageId}'); event.stopPropagation();">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="removeImage('${imageId}'); event.stopPropagation();">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="uploading-indicator text-center small text-muted">
+                <i class="fas fa-spinner fa-spin"></i> Uploading...
+            </div>
+        </div>
+    `;
+    
+    insertHTML(imageHtml);
+    
+    // Upload to server
+    fetch('add-lesson.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        const container = document.getElementById(imageId);
+        
+        if (data.success) {
+            // Update container with server data
+            container.setAttribute('data-image-id', data.image_id);
+            container.setAttribute('data-filename', data.filename);
+            container.setAttribute('data-filepath', data.filepath);
+            container.removeAttribute('data-temp');
+            
+            // Update image src
+            const img = container.querySelector('img');
+            img.src = data.url;
+            img.alt = data.alt_text;
+            
+            // Remove uploading indicator
+            const indicator = container.querySelector('.uploading-indicator');
+            if (indicator) indicator.remove();
+            
+            // Reset modal
+            document.getElementById('imageFile').value = '';
+            document.getElementById('imageAlt').value = '';
+            document.getElementById('imagePreview').style.display = 'none';
+            
+            const modal = bootstrap.Modal.getInstance(document.getElementById('imageUploadModal'));
+            modal.hide();
+            
+            showToast('Image uploaded successfully', 'success');
+            
+            // Clean up temporary URL
+            URL.revokeObjectURL(tempUrl);
+            
+            // Update content for form submission
+            updateContent();
+        } else {
+            // Show error and remove container
+            container.remove();
+            showToast('Upload failed: ' + data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Upload error:', error);
+        const container = document.getElementById(imageId);
+        if (container) container.remove();
+        showToast('Failed to upload image', 'danger');
+    });
+}
+
+// Show image options (for overlay click)
+function showImageOptions(imageId) {
+    const container = document.getElementById(imageId);
+    if (!container) return;
+    
+    // You can add additional logic here if needed
+    // For now, just focus on the image
+    container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// Edit image properties (alt text, etc.)
+function editImageProperties(imageId) {
+    const container = document.getElementById(imageId);
+    if (!container) return;
+    
+    const img = container.querySelector('img');
+    const currentAlt = img.alt || '';
+    const imageIdAttr = container.getAttribute('data-image-id');
+    
+    // Create a modal for editing
+    const editModalHtml = `
+        <div class="modal fade" id="editImageModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Image</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Image Preview</label>
+                            <div class="text-center">
+                                <img src="${img.src}" alt="${currentAlt}" class="img-fluid rounded mb-3" style="max-height: 200px;">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Alt Text (Description)</label>
+                            <input type="text" class="form-control" id="editImageAlt" value="${currentAlt}" placeholder="Describe the image">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Width (optional)</label>
+                            <input type="number" class="form-control" id="editImageWidth" placeholder="Auto" min="50" max="2000">
+                            <small class="form-text text-muted">Leave empty for auto sizing</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-danger" onclick="deleteImageFromEditor('${imageId}')">
+                            <i class="fas fa-trash me-1"></i> Delete
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="saveImageChanges('${imageId}')">
+                            <i class="fas fa-save me-1"></i> Save Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('editImageModal');
+    if (existingModal) existingModal.remove();
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', editModalHtml);
+    
+    // Set current width if exists
+    const currentWidth = img.style.width || img.getAttribute('width') || '';
+    if (currentWidth) {
+        document.getElementById('editImageWidth').value = currentWidth.replace('px', '');
+    }
+    
+    // Show modal
+    const editModal = new bootstrap.Modal(document.getElementById('editImageModal'));
+    editModal.show();
+}
+
+// Save image changes
+function saveImageChanges(imageId) {
+    const container = document.getElementById(imageId);
+    if (!container) return;
+    
+    const img = container.querySelector('img');
+    const newAlt = document.getElementById('editImageAlt').value;
+    const newWidth = document.getElementById('editImageWidth').value;
+    const imageIdAttr = container.getAttribute('data-image-id');
+    
+    // Update local image
+    img.alt = newAlt;
+    if (newWidth) {
+        img.style.width = newWidth + 'px';
+        img.setAttribute('width', newWidth);
+    } else {
+        img.style.width = '';
+        img.removeAttribute('width');
+    }
+    
+    // Update in database if image has ID
+    if (imageIdAttr) {
+        fetch('add-lesson.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `action=update_image_alt&image_id=${imageIdAttr}&alt_text=${encodeURIComponent(newAlt)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Image updated successfully', 'success');
+            }
+        });
+    }
+    
+    // Close modal
+    const editModal = bootstrap.Modal.getInstance(document.getElementById('editImageModal'));
+    editModal.hide();
+    
+    // Update content for form submission
+    updateContent();
+}
+
+// Replace image with new one
+function replaceImage(imageId) {
+    const container = document.getElementById(imageId);
+    if (!container) return;
+    
+    const imageIdAttr = container.getAttribute('data-image-id');
+    const currentAlt = container.querySelector('img').alt;
+    
+    // Create file input for replacement
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.style.display = 'none';
+    
+    fileInput.onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // Validate file
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml'];
+        if (!allowedTypes.includes(file.type)) {
+            showToast('Invalid file type. Allowed: JPEG, PNG, GIF, SVG', 'warning');
+            return;
+        }
+        
+        if (file.size > 5 * 1024 * 1024) {
+            showToast('File too large. Maximum size: 5MB', 'warning');
+            return;
+        }
+        
+        // Show loading
+        const img = container.querySelector('img');
+        const originalSrc = img.src;
+        img.style.opacity = '0.5';
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('action', 'upload_image');
+        formData.append('image', file);
+        formData.append('alt_text', currentAlt);
+        if (currentLessonId) {
+            formData.append('lesson_id', currentLessonId);
+        }
+        
+        // Upload new image
+        fetch('add-lesson.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update image src
+                img.src = data.url;
+                img.style.opacity = '1';
+                
+                // Update container data
+                container.setAttribute('data-image-id', data.image_id);
+                container.setAttribute('data-filename', data.filename);
+                container.setAttribute('data-filepath', data.filepath);
+                
+                // Delete old image from server if it has an ID
+                if (imageIdAttr) {
+                    fetch('add-lesson.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: `action=delete_image&image_id=${imageIdAttr}`
+                    });
+                }
+                
+                showToast('Image replaced successfully', 'success');
+                updateContent();
+            } else {
+                img.style.opacity = '1';
+                showToast('Failed to replace image: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            img.style.opacity = '1';
+            showToast('Failed to replace image', 'danger');
+        });
+        
+        // Clean up
+        fileInput.remove();
+    };
+    
+    // Trigger file selection
+    document.body.appendChild(fileInput);
+    fileInput.click();
+}
+
+// Delete image from editor (with confirmation)
+function deleteImageFromEditor(imageId) {
+    if (confirm('Are you sure you want to delete this image?')) {
+        removeImage(imageId);
+        const editModal = bootstrap.Modal.getInstance(document.getElementById('editImageModal'));
+        if (editModal) editModal.hide();
+    }
+}
+
+// Remove image from editor and server
+function removeImage(imageId) {
+    const container = document.getElementById(imageId);
+    if (!container) return;
+    
+    const imageIdAttr = container.getAttribute('data-image-id');
+    const isTemp = container.hasAttribute('data-temp');
+    
+    // Remove from editor immediately
+    container.remove();
+    updateContent();
+    
+    // Delete from server if not temp and has ID
+    if (!isTemp && imageIdAttr) {
+        fetch('add-lesson.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `action=delete_image&image_id=${imageIdAttr}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Image deleted from server', 'success');
+            }
+        });
+    }
+}
+
+// Initialize image hover effects
+function initImageHoverEffects() {
+    // This function is now handled by CSS hover effects
+    // Keeping it for compatibility
+}
+
+// Process existing images when loading a lesson
+function processExistingImages() {
+    document.querySelectorAll('#lessonContent img').forEach(img => {
+        // Skip if already wrapped
+        if (img.closest('.image-container')) return;
+        
+        // Wrap image in container with controls
+        const containerId = 'img-' + Date.now();
+        const altText = img.alt || '';
+        const imgHtml = img.outerHTML;
+        
+        const wrapperHtml = `
+            <div class="image-container" id="${containerId}">
+                <div class="image-wrapper">
+                    ${imgHtml}
+                    
+                    <!-- Floating control buttons -->
+                    <div class="image-controls">
+                        <button class="image-control-btn delete" onclick="removeImage('${containerId}')" title="Delete">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <button class="image-control-btn edit" onclick="editImageProperties('${containerId}')" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="image-control-btn replace" onclick="replaceImage('${containerId}')" title="Replace">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Overlay for click-to-edit -->
+                    <div class="image-overlay" onclick="showImageOptions('${containerId}')">
+                        <div class="image-options">
+                            <button class="btn btn-sm btn-outline-light me-1" onclick="editImageProperties('${containerId}'); event.stopPropagation();">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="removeImage('${containerId}'); event.stopPropagation();">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Replace image with wrapper
+        img.outerHTML = wrapperHtml;
+    });
+}
+
+// Call this after loading lesson content
+setTimeout(processExistingImages, 100);
         
         // Insert HTML content
         function insertHTML(html) {
@@ -1295,6 +1984,7 @@ console.log('Hello, World!');</code></pre>
                     
                     // Set lesson content
                     document.getElementById('lessonContent').innerHTML = data.lesson.lesson_content;
+                    setTimeout(processExistingImages, 100);
                     updateContent();
                     
                     // Load quiz data if exists
@@ -1352,126 +2042,142 @@ console.log('Hello, World!');</code></pre>
             }
         }
         
-        // Save lesson
-        function saveLesson() {
-            // Validate required fields
-            const topicId = document.getElementById('topicSelect').value;
-            const lessonTitle = document.getElementById('lessonTitle').value;
-            const lessonOrder = document.getElementById('lessonOrder').value;
-            
-            if (!topicId || !lessonTitle || !lessonOrder) {
-                showToast('Please fill all required fields (Topic, Title, Order)', 'warning');
-                return;
-            }
-            
-            // Get quiz options
-            const options = [];
-            let hasCorrectAnswer = false;
-            
-            document.querySelectorAll('.quiz-option-item').forEach(item => {
-                const textInput = item.querySelector('.option-text');
-                const isCorrect = item.querySelector('input[type="radio"]').checked;
-                
-                if (textInput.value.trim()) {
-                    options.push({
-                        text: textInput.value.trim(),
-                        is_correct: isCorrect ? 1 : 0
-                    });
-                    
-                    if (isCorrect) hasCorrectAnswer = true;
-                }
+// Save lesson - FIXED VERSION with HTML cleaning
+function saveLesson() {
+    // Validate required fields
+    const topicId = document.getElementById('topicSelect').value;
+    const lessonTitle = document.getElementById('lessonTitle').value;
+    const lessonOrder = document.getElementById('lessonOrder').value;
+    
+    if (!topicId || !lessonTitle || !lessonOrder) {
+        showToast('Please fill all required fields (Topic, Title, Order)', 'warning');
+        return;
+    }
+    
+    // Get quiz options
+    const options = [];
+    let hasCorrectAnswer = false;
+    
+    document.querySelectorAll('.quiz-option-item').forEach(item => {
+        const textInput = item.querySelector('.option-text');
+        const isCorrect = item.querySelector('input[type="radio"]').checked;
+        
+        if (textInput.value.trim()) {
+            options.push({
+                text: textInput.value.trim(),
+                is_correct: isCorrect ? 1 : 0
             });
             
-            // Validate quiz if question is provided
-            const quizQuestion = document.getElementById('quizQuestion').value.trim();
-            if (quizQuestion) {
-                if (options.length < 2) {
-                    showToast('Quiz must have at least 2 answer options', 'warning');
-                    return;
-                }
-                
-                if (!hasCorrectAnswer) {
-                    showToast('Please select the correct answer for the quiz', 'warning');
-                    return;
-                }
-            }
-            
-            // Prepare data
-            const formData = new FormData();
-            formData.append('action', 'save_lesson');
-            formData.append('lesson_id', currentLessonId || '');
-            formData.append('topic_id', topicId);
-            formData.append('lesson_title', lessonTitle);
-            formData.append('lesson_content', document.getElementById('lessonContentText').value);
-            formData.append('lesson_order', lessonOrder);
-            formData.append('content_type', document.querySelector('input[name="contentType"]:checked').value);
-            formData.append('is_active', document.getElementById('lessonActive').checked ? 1 : 0);
-            
-            // Show loading state
-            const saveBtn = document.getElementById('saveLessonBtn');
-            const originalHtml = saveBtn.innerHTML;
-            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Saving...';
-            saveBtn.disabled = true;
-            
-            // Save lesson
-            fetch('add-lesson.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    currentLessonId = data.lesson_id;
-                    
-                    // Save quiz if question exists
-                    if (quizQuestion) {
-                        const quizData = new FormData();
-                        quizData.append('action', 'save_quiz');
-                        quizData.append('quiz_id', currentQuizId || '');
-                        quizData.append('lesson_id', data.lesson_id);
-                        quizData.append('question', quizQuestion);
-                        quizData.append('explanation', document.getElementById('quizExplanation').value);
-                        quizData.append('difficulty', document.querySelector('input[name="difficulty"]:checked').value);
-                        quizData.append('options', JSON.stringify(options));
-                        
-                        return fetch('add-lesson.php', {
-                            method: 'POST',
-                            body: quizData
-                        });
-                    }
-                    
-                    return Promise.resolve({ success: true });
-                } else {
-                    throw new Error(data.message);
-                }
-            })
-            .then(response => response ? response.json() : { success: true })
-            .then(data => {
-                if (data.success) {
-                    if (data.quiz_id) {
-                        currentQuizId = data.quiz_id;
-                    }
-                    
-                    showToast('Lesson saved successfully!', 'success');
-                    
-                    // Update lessons list
-                    loadTopicLessons();
-                    
-                    // Save draft to localStorage
-                    saveDraft();
-                } else {
-                    throw new Error(data.message);
-                }
-            })
-            .catch(error => {
-                showToast('Error saving lesson: ' + error.message, 'danger');
-            })
-            .finally(() => {
-                // Restore button state
-                saveBtn.innerHTML = originalHtml;
-                saveBtn.disabled = false;
-            });
+            if (isCorrect) hasCorrectAnswer = true;
         }
+    });
+    
+    // Validate quiz if question is provided
+    const quizQuestion = document.getElementById('quizQuestion').value.trim();
+    if (quizQuestion) {
+        if (options.length < 2) {
+            showToast('Quiz must have at least 2 answer options', 'warning');
+            return;
+        }
+        
+        if (!hasCorrectAnswer) {
+            showToast('Please select the correct answer for the quiz', 'warning');
+            return;
+        }
+    }
+    
+    // Get content and clean it
+    const editorContent = document.getElementById('lessonContent');
+    const cleanedContent = cleanLessonContent(editorContent.innerHTML);
+    
+    // Prepare data
+    const formData = new FormData();
+    formData.append('action', 'save_lesson');
+    formData.append('lesson_id', currentLessonId || '');
+    formData.append('topic_id', topicId);
+    formData.append('lesson_title', lessonTitle);
+    formData.append('lesson_content', cleanedContent); // Use cleaned content
+    formData.append('lesson_order', lessonOrder);
+    formData.append('content_type', document.querySelector('input[name="contentType"]:checked').value);
+    formData.append('is_active', document.getElementById('lessonActive').checked ? 1 : 0);
+    
+    // Show loading state
+    const saveBtn = document.getElementById('saveLessonBtn');
+    const originalHtml = saveBtn.innerHTML;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Saving...';
+    saveBtn.disabled = true;
+    
+    // Save lesson
+    fetch('add-lesson.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            currentLessonId = data.lesson_id;
+            
+            // Save quiz if question exists
+            if (quizQuestion) {
+                const quizData = new FormData();
+                quizData.append('action', 'save_quiz');
+                quizData.append('quiz_id', currentQuizId || '');
+                quizData.append('lesson_id', data.lesson_id);
+                quizData.append('question', quizQuestion);
+                quizData.append('explanation', document.getElementById('quizExplanation').value);
+                quizData.append('difficulty', document.querySelector('input[name="difficulty"]:checked').value);
+                quizData.append('options', JSON.stringify(options));
+                
+                return fetch('add-lesson.php', {
+                    method: 'POST',
+                    body: quizData
+                })
+                .then(quizResponse => {
+                    if (!quizResponse.ok) {
+                        throw new Error(`HTTP error! status: ${quizResponse.status}`);
+                    }
+                    return quizResponse.json();
+                })
+                .then(quizData => {
+                    if (quizData.success) {
+                        currentQuizId = quizData.quiz_id;
+                    }
+                    return { success: true, quizData: quizData };
+                });
+            } else {
+                // No quiz to save, just return success
+                return Promise.resolve({ success: true });
+            }
+        } else {
+            throw new Error(data.message);
+        }
+    })
+    .then(result => {
+        if (result.success) {
+            showToast('Lesson saved successfully!', 'success');
+            
+            // Update lessons list
+            loadTopicLessons();
+            
+            // Save draft to localStorage (with cleaned content)
+            saveDraft();
+        }
+    })
+    .catch(error => {
+        console.error('Save error:', error);
+        showToast('Error saving lesson: ' + error.message, 'danger');
+    })
+    .finally(() => {
+        // Restore button state
+        saveBtn.innerHTML = originalHtml;
+        saveBtn.disabled = false;
+    });
+}
         
         // Preview lesson
         function previewLesson() {
@@ -1654,24 +2360,90 @@ let bigNumber = 9007199254740991n;</code></pre>
             });
         }
         
-        // Save draft to localStorage
-        function saveDraft() {
-            const draft = {
-                topic_id: document.getElementById('topicSelect').value,
-                lesson_title: document.getElementById('lessonTitle').value,
-                lesson_content: document.getElementById('lessonContentText').value,
-                lesson_order: document.getElementById('lessonOrder').value,
-                content_type: document.querySelector('input[name="contentType"]:checked').value,
-                is_active: document.getElementById('lessonActive').checked,
-                quiz_question: document.getElementById('quizQuestion').value,
-                quiz_explanation: document.getElementById('quizExplanation').value,
-                difficulty: document.querySelector('input[name="difficulty"]:checked').value,
-                timestamp: new Date().getTime()
-            };
+       // Also update the saveDraft function to use cleaned content
+function saveDraft() {
+    const editorContent = document.getElementById('lessonContent');
+    const cleanedContent = cleanLessonContent(editorContent.innerHTML);
+    
+    const draft = {
+        topic_id: document.getElementById('topicSelect').value,
+        lesson_title: document.getElementById('lessonTitle').value,
+        lesson_content: cleanedContent, // Use cleaned content
+        lesson_order: document.getElementById('lessonOrder').value,
+        content_type: document.querySelector('input[name="contentType"]:checked').value,
+        is_active: document.getElementById('lessonActive').checked,
+        quiz_question: document.getElementById('quizQuestion').value,
+        quiz_explanation: document.getElementById('quizExplanation').value,
+        difficulty: document.querySelector('input[name="difficulty"]:checked').value,
+        timestamp: new Date().getTime()
+    };
+    
+    localStorage.setItem('lesson_draft', JSON.stringify(draft));
+}
+
+// Function to clean lesson content by removing editor controls
+function cleanLessonContent(html) {
+    // Create a temporary div to parse the HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    
+    // Remove all image controls and wrappers
+    tempDiv.querySelectorAll('.image-container').forEach(container => {
+        const img = container.querySelector('img');
+        if (img) {
+            // Get the image element
+            const cleanImg = document.createElement('img');
+            cleanImg.src = img.src;
+            cleanImg.alt = img.alt || '';
+            cleanImg.className = img.className;
+            cleanImg.style.cssText = img.style.cssText;
             
-            localStorage.setItem('lesson_draft', JSON.stringify(draft));
+            // Copy width/height attributes if they exist
+            if (img.width) cleanImg.width = img.width;
+            if (img.height) cleanImg.height = img.height;
+            if (img.getAttribute('width')) cleanImg.setAttribute('width', img.getAttribute('width'));
+            if (img.getAttribute('height')) cleanImg.setAttribute('height', img.getAttribute('height'));
+            
+            // Replace the container with just the image
+            container.replaceWith(cleanImg);
         }
-        
+    });
+    
+    // Remove any remaining control buttons that might be outside containers
+    tempDiv.querySelectorAll('.image-controls, .image-overlay, .image-options, .image-control-btn, .uploading-indicator').forEach(el => {
+        el.remove();
+    });
+    
+    // Remove any data attributes from images
+    tempDiv.querySelectorAll('img').forEach(img => {
+        ['data-image-id', 'data-filename', 'data-filepath', 'data-temp'].forEach(attr => {
+            img.removeAttribute(attr);
+        });
+    });
+    
+    return tempDiv.innerHTML;
+}
+        // Clean up unused images
+function cleanupUnusedImages() {
+    if (confirm('This will delete all unused images from the server. Continue?')) {
+        fetch('add-lesson.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'action=cleanup_images'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(`Cleaned up ${data.deleted_count} unused images`, 'success');
+            } else {
+                showToast('Cleanup failed: ' + data.message, 'danger');
+            }
+        });
+    }
+}
+
         // Load draft from localStorage
         function loadDraft() {
             const draft = localStorage.getItem('lesson_draft');
@@ -1775,6 +2547,39 @@ function initCopyButtons() {
         };
     });
 }
+
+// Add keyboard shortcuts for image controls
+document.addEventListener('keydown', function(e) {
+    // If an image container is focused
+    const focusedImage = document.querySelector('.image-container:focus-within');
+    if (focusedImage) {
+        const imageId = focusedImage.id;
+        
+        switch(e.key) {
+            case 'Delete':
+            case 'Backspace':
+                if (e.ctrlKey) {
+                    removeImage(imageId);
+                    e.preventDefault();
+                }
+                break;
+            case 'e':
+            case 'E':
+                if (e.ctrlKey) {
+                    editImageProperties(imageId);
+                    e.preventDefault();
+                }
+                break;
+            case 'r':
+            case 'R':
+                if (e.ctrlKey) {
+                    replaceImage(imageId);
+                    e.preventDefault();
+                }
+                break;
+        }
+    }
+});
 
 // Call this after inserting content or loading
 setTimeout(initCopyButtons, 100);

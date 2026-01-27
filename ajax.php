@@ -41,6 +41,42 @@ if (isset($_GET['action'])) {
                 $response = ['success' => false, 'message' => 'Not logged in'];
             }
             break;
+
+        // In your ajax.php switch statement, add:
+        case 'get_dashboard_stats':
+            if ($studentSession->isLoggedIn()) {
+                $stats = $studentSession->getDashboardStats();
+                $goals = $studentSession->getLearningGoals();
+                if ($stats) {
+                    $response = ['stats' => $stats, 'goals' => $goals];
+                } else {
+                    $response = ['error' => 'No dashboard data available'];
+                }
+            } else {
+                $response = ['error' => 'Not logged in'];
+            }
+            break;
+
+        // Add this to your switch statement in ajax.php:
+        case 'get_recent_activity':
+            if ($studentSession->isLoggedIn()) {
+                $recentQuery = "SELECT sqa.*, q.question, l.lesson_title, t.topic_name
+                                FROM student_quiz_attempts sqa
+                                JOIN quizzes q ON sqa.quiz_id = q.id
+                                JOIN lessons l ON q.lesson_id = l.id
+                                JOIN topics t ON l.topic_id = t.id
+                                WHERE sqa.student_id = ?
+                                AND l.deleted_at IS NULL
+                                ORDER BY sqa.attempted_at DESC
+                                LIMIT 5";
+                $recentStmt = $conn->prepare($recentQuery);
+                $recentStmt->execute([$studentSession->getStudentId()]);
+                $activities = $recentStmt->fetchAll(PDO::FETCH_ASSOC);
+                $response = ['activities' => $activities];
+            } else {
+                $response = ['error' => 'Not logged in'];
+            }
+            break;
             
         default:
             $response = ['error' => 'Invalid action'];

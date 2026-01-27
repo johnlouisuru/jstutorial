@@ -266,34 +266,86 @@ class StudentSession {
         }
     }
     
-    public function getQuizStatistics($student_id = null) {
-        $student_id = $student_id ?? $this->getStudentId();
-        
-        if (!$student_id) {
-            return null;
-        }
-        
+    public function getQuizStatistics() {
         try {
-            $query = "SELECT 
-                        COUNT(*) as total_attempts,
-                        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_attempts,
-                        SUM(CASE WHEN is_correct = 0 THEN 1 ELSE 0 END) as incorrect_attempts,
-                        CASE 
-                            WHEN COUNT(*) > 0 THEN 
-                                ROUND(SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1)
-                            ELSE 0
-                        END as accuracy_rate,
-                        AVG(time_spent) as avg_time_spent
-                      FROM student_quiz_attempts 
-                      WHERE student_id = :student_id";
+            $student_id = $this->getStudentId();
             
-            $stmt = $this->conn->prepare($query);
-            $stmt->bindParam(':student_id', $student_id, PDO::PARAM_INT);
-            $stmt->execute();
+            if (!$student_id) {
+                return false;
+            }
             
-            return $stmt->fetch(PDO::FETCH_ASSOC);
-        } catch(PDOException $e) {
-            return null;
+            // Get quiz statistics
+            $quizStatsQuery = "SELECT 
+                COUNT(*) as total_attempts,
+                SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_attempts,
+                SUM(CASE WHEN is_correct = 0 THEN 1 ELSE 0 END) as incorrect_attempts,
+                AVG(time_spent) as avg_time_spent
+                FROM student_quiz_attempts 
+                WHERE student_id = ?";
+            $quizStmt = $this->conn->prepare($quizStatsQuery);
+            $quizStmt->execute([$student_id]);
+            $quizStats = $quizStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Calculate accuracy rate
+            $accuracy_rate = 0;
+            if ($quizStats['total_attempts'] > 0) {
+                $accuracy_rate = round(($quizStats['correct_attempts'] / $quizStats['total_attempts']) * 100, 2);
+            }
+            
+            // NEW: Get lessons finished statistics
+            $lessonsStatsQuery = "SELECT 
+                COUNT(*) as total_finished_lessons,
+                (SELECT COUNT(*) FROM lessons WHERE is_active = 1 AND deleted_at IS NULL) as total_active_lessons
+                FROM student_progress sp
+                JOIN lessons l ON sp.lesson_id = l.id
+                WHERE sp.student_id = ? 
+                AND sp.is_completed = 1
+                AND l.is_active = 1
+                AND l.deleted_at IS NULL";
+            $lessonsStmt = $this->conn->prepare($lessonsStatsQuery);
+            $lessonsStmt->execute([$student_id]);
+            $lessonsStats = $lessonsStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Calculate lessons completion rate
+            $lessons_completion_rate = 0;
+            if ($lessonsStats['total_active_lessons'] > 0) {
+                $lessons_completion_rate = round(($lessonsStats['total_finished_lessons'] / $lessonsStats['total_active_lessons']) * 100, 2);
+            }
+            
+            // Get topic-wise progress
+            $topicsProgressQuery = "SELECT 
+                t.id,
+                t.topic_name,
+                COUNT(l.id) as total_lessons,
+                COUNT(sp.lesson_id) as completed_lessons
+                FROM topics t
+                LEFT JOIN lessons l ON t.id = l.topic_id 
+                    AND l.is_active = 1 
+                    AND l.deleted_at IS NULL
+                LEFT JOIN student_progress sp ON l.id = sp.lesson_id 
+                    AND sp.student_id = ? 
+                    AND sp.is_completed = 1
+                WHERE t.is_active = 1
+                AND t.deleted_at IS NULL
+                GROUP BY t.id, t.topic_name
+                ORDER BY t.topic_order";
+            
+            $topicsStmt = $this->conn->prepare($topicsProgressQuery);
+            $topicsStmt->execute([$student_id]);
+            $topicsProgress = $topicsStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Combine all stats
+            $stats = array_merge($quizStats, $lessonsStats, [
+                'accuracy_rate' => $accuracy_rate,
+                'lessons_completion_rate' => $lessons_completion_rate,
+                'topics_progress' => $topicsProgress
+            ]);
+            
+            return $stats;
+            
+        } catch (Exception $e) {
+            error_log("Error getting quiz stats: " . $e->getMessage());
+            return false;
         }
     }
     
@@ -335,5 +387,219 @@ class StudentSession {
             return false;
         }
     }
+
+// Also update getPredictiveAnalytics() to handle empty results better:
+public function getPredictiveAnalytics() {
+    try {
+        $student_id = $this->getStudentId();
+        
+        if (!$student_id) {
+            return [
+                'learning_streak' => 0,
+                'active_days_this_week' => 0,
+                'estimated_completion_minutes' => 0,
+                'goal_progress' => 0,
+                'weakest_topic' => null,
+                'strongest_topic' => null,
+                'weekly_activity' => [],
+                'remaining_lessons' => 0
+            ];
+        }
+        
+        // Get learning streak
+        $streakQuery = "SELECT 
+            IFNULL(DATEDIFF(CURDATE(), MAX(last_accessed)), 999) as days_since_last_activity,
+            (SELECT COUNT(DISTINCT DATE(last_accessed)) 
+             FROM student_progress 
+             WHERE student_id = ? 
+             AND last_accessed >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)) as active_days_this_week
+            FROM student_progress 
+            WHERE student_id = ?";
+        $streakStmt = $this->conn->prepare($streakQuery);
+        $streakStmt->execute([$student_id, $student_id]);
+        $streakData = $streakStmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Calculate learning streak (consecutive days)
+        $streak = 0;
+        if ($streakData && $streakData['days_since_last_activity'] == 0) {
+            $streakQuery2 = "WITH RECURSIVE dates AS (
+                SELECT CURDATE() as date
+                UNION ALL
+                SELECT DATE_SUB(date, INTERVAL 1 DAY)
+                FROM dates
+                WHERE date > DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+            )
+            SELECT COUNT(*) as streak
+            FROM dates d
+            WHERE NOT EXISTS (
+                SELECT 1 FROM student_progress sp
+                WHERE sp.student_id = ?
+                AND DATE(sp.last_accessed) = d.date
+                LIMIT 1
+            )
+            ORDER BY d.date DESC
+            LIMIT 1";
+            
+            $streakStmt2 = $this->conn->prepare($streakQuery2);
+            $streakStmt2->execute([$student_id]);
+            $streakResult = $streakStmt2->fetch(PDO::FETCH_ASSOC);
+            $streak = $streakResult ? (30 - $streakResult['streak']) : 1;
+        }
+        
+        // Get estimated completion time
+        $completionQuery = "SELECT 
+            COUNT(*) as total_lessons,
+            SUM(CASE WHEN sp.is_completed = 1 THEN 1 ELSE 0 END) as completed_lessons,
+            AVG(sqa.time_spent) as avg_quiz_time
+            FROM lessons l
+            LEFT JOIN student_progress sp ON l.id = sp.lesson_id AND sp.student_id = ?
+            LEFT JOIN student_quiz_attempts sqa ON sqa.student_id = ?
+            WHERE l.is_active = 1 AND l.deleted_at IS NULL";
+        
+        $completionStmt = $this->conn->prepare($completionQuery);
+        $completionStmt->execute([$student_id, $student_id]);
+        $completionData = $completionStmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Calculate estimated completion
+        $remaining = isset($completionData['total_lessons']) ? 
+            ($completionData['total_lessons'] - ($completionData['completed_lessons'] ?? 0)) : 0;
+        
+        $avgTimePerLesson = isset($completionData['avg_quiz_time']) && $completionData['avg_quiz_time'] > 0 ? 
+            $completionData['avg_quiz_time'] * 2 : 300; // Default 5 minutes per lesson
+        
+        $estimatedMinutes = $remaining > 0 ? round(($remaining * $avgTimePerLesson) / 60) : 0;
+        
+        // Calculate daily goal progress
+        $goalProgress = isset($streakData['active_days_this_week']) ? 
+            ($streakData['active_days_this_week'] / 7 * 100) : 0;
+        
+        // Get topic difficulty analysis
+        $difficultyQuery = "SELECT 
+            t.topic_name,
+            COUNT(DISTINCT sqa.quiz_id) as total_quizzes,
+            SUM(CASE WHEN sqa.is_correct = 1 THEN 1 ELSE 0 END) as correct_quizzes,
+            AVG(sqa.time_spent) as avg_time
+            FROM topics t
+            JOIN lessons l ON t.id = l.topic_id
+            JOIN quizzes q ON l.id = q.lesson_id
+            LEFT JOIN student_quiz_attempts sqa ON q.id = sqa.quiz_id AND sqa.student_id = ?
+            WHERE t.is_active = 1
+            GROUP BY t.id
+            HAVING total_quizzes > 0
+            ORDER BY (correct_quizzes/total_quizzes) ASC";
+        
+        $difficultyStmt = $this->conn->prepare($difficultyQuery);
+        $difficultyStmt->execute([$student_id]);
+        $difficultyData = $difficultyStmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Identify weakest and strongest topics
+        $weakestTopic = null;
+        $strongestTopic = null;
+        if (!empty($difficultyData)) {
+            $weakestTopic = $difficultyData[0];
+            $strongestTopic = end($difficultyData);
+        }
+        
+        // Get weekly activity
+        $weeklyQuery = "SELECT 
+            DAYNAME(sp.last_accessed) as day_name,
+            COUNT(DISTINCT sp.lesson_id) as lessons_completed,
+            COUNT(DISTINCT sqa.quiz_id) as quizzes_attempted
+            FROM student_progress sp
+            LEFT JOIN student_quiz_attempts sqa ON DATE(sqa.attempted_at) = DATE(sp.last_accessed) AND sqa.student_id = ?
+            WHERE sp.student_id = ?
+            AND sp.last_accessed >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            GROUP BY DATE(sp.last_accessed)
+            ORDER BY sp.last_accessed DESC
+            LIMIT 7";
+        
+        $weeklyStmt = $this->conn->prepare($weeklyQuery);
+        $weeklyStmt->execute([$student_id, $student_id]);
+        $weeklyActivity = $weeklyStmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        return [
+            'learning_streak' => $streak,
+            'active_days_this_week' => $streakData['active_days_this_week'] ?? 0,
+            'estimated_completion_minutes' => $estimatedMinutes,
+            'goal_progress' => round($goalProgress),
+            'weakest_topic' => $weakestTopic,
+            'strongest_topic' => $strongestTopic,
+            'weekly_activity' => $weeklyActivity,
+            'remaining_lessons' => $remaining
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Error getting predictive analytics: " . $e->getMessage());
+        return [
+            'learning_streak' => 0,
+            'active_days_this_week' => 0,
+            'estimated_completion_minutes' => 0,
+            'goal_progress' => 0,
+            'weakest_topic' => null,
+            'strongest_topic' => null,
+            'weekly_activity' => [],
+            'remaining_lessons' => 0
+        ];
+    }
+}
+
+// In your StudentSession class, update the getDashboardStats() method:
+public function getDashboardStats() {
+    $stats = $this->getQuizStatistics();
+    $analytics = $this->getPredictiveAnalytics();
+    
+    // Handle empty arrays properly
+    if (!$stats) $stats = [];
+    if (!$analytics) $analytics = [];
+    
+    // Merge arrays, ensuring all keys exist
+    $mergedStats = array_merge([
+        'accuracy_rate' => 0,
+        'correct_attempts' => 0,
+        'total_attempts' => 0,
+        'incorrect_attempts' => 0,
+        'avg_time_spent' => 0,
+        'total_finished_lessons' => 0,
+        'total_active_lessons' => 0,
+        'lessons_completion_rate' => 0,
+        'topics_progress' => [],
+        'learning_streak' => 0,
+        'active_days_this_week' => 0,
+        'estimated_completion_minutes' => 0,
+        'goal_progress' => 0,
+        'weakest_topic' => null,
+        'strongest_topic' => null,
+        'weekly_activity' => [],
+        'remaining_lessons' => 0
+    ], $stats, $analytics);
+    
+    return $mergedStats;
+}
+
+public function getLearningGoals() {
+    $student_id = $this->getStudentId();
+    
+    // Get recommended next lessons based on progress
+    $recommendationQuery = "SELECT 
+        l.id, l.lesson_title, l.content_type, t.topic_name,
+        (SELECT COUNT(*) FROM quizzes q WHERE q.lesson_id = l.id) as quiz_count,
+        (SELECT COUNT(*) FROM student_quiz_attempts sqa 
+         JOIN quizzes q ON sqa.quiz_id = q.id 
+         WHERE q.lesson_id = l.id AND sqa.student_id = ? AND sqa.is_correct = 1) as correct_quizzes
+        FROM lessons l
+        JOIN topics t ON l.topic_id = t.id
+        WHERE l.is_active = 1 
+        AND l.deleted_at IS NULL
+        AND l.id NOT IN (
+            SELECT lesson_id FROM student_progress 
+            WHERE student_id = ? AND is_completed = 1
+        )
+        ORDER BY t.topic_order, l.lesson_order
+        LIMIT 5";
+    
+    $stmt = $this->conn->prepare($recommendationQuery);
+    $stmt->execute([$student_id, $student_id]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 }
 ?>

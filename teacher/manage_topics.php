@@ -273,7 +273,31 @@ function reorderTopics($conn, $order) {
         </div>
         
         <div class="row">
-            <div class="col-md-8">
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">Navigation</h5>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        <a href="manage_topics" class="list-group-item list-group-item-action">
+                            <i class="fas fa-folder me-2"></i> Manage Topics
+                        </a>
+                        <a href="manage_lessons" class="list-group-item list-group-item-action">
+                            <i class="fas fa-book me-2"></i> Manage Lessons
+                        </a>
+                        <!-- <a href="#" class="list-group-item list-group-item-action">
+                            <i class="fas fa-users me-2"></i> Student Progress
+                        </a> -->
+                        <a href="student_management" class="list-group-item list-group-item-action">
+                            <i class="fas fa-users me-2"></i> Student Management
+                        </a>
+                        <a href="analytics" class="list-group-item list-group-item-action">
+                            <i class="fas fa-chart-bar me-2"></i> Analytics
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-9">
                 <div class="card">
                     <div class="card-header bg-light">
                     
@@ -349,7 +373,11 @@ function reorderTopics($conn, $order) {
                 </div>
             </div>
             
-            <div class="col-md-4">
+            
+        </div>
+        <hr />
+        <div class="row">
+            <div class="col-md-6">
                 <div class="card mb-4">
                     <div class="card-header bg-light">
                         <h5 class="mb-0">Quick Stats</h5>
@@ -391,7 +419,8 @@ function reorderTopics($conn, $order) {
                         </div>
                     </div>
                 </div>
-                
+            </div>
+            <div class="col-md-6">   
                 <div class="card">
                     <div class="card-header bg-light">
                         <h5 class="mb-0">Tips</h5>
@@ -417,7 +446,8 @@ function reorderTopics($conn, $order) {
                         </ul>
                     </div>
                 </div>
-            </div>
+            </div> 
+            
         </div>
     </div>
     

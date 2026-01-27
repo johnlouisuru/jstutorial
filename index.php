@@ -221,9 +221,8 @@ $studentData = $studentSession->getStudentData();
         <div class="container">
             <div class="row align-items-center">
                 <div class="col-lg-8">
-                    <h1 class="display-4 fw-bold mb-3">Aralin ang JavaScript sa pinaka madaling paraan.</h1>
-                    <p class="lead mb-4">Interaktibong tutorial na may mga hands-on na mga ehersisyo, real-time na pagpapa-gana ng code, 
-                    at pagsubaybay sa progreso. Perpekto ito para sa mga baguhan at may karanasan na mga developer.</p>
+                    <h1 class="display-4 fw-bold mb-3">Zero to Hero! 🚀</h1>
+                    <p class="lead mb-4">💡 “Every great developer started with nothing. On this platform, you’ll learn JavaScript from the basics to real-world projects. Stop watching—start creating.”</p>
                     <?php if ($studentSession->isLoggedIn()): ?>
                     <div class="alert alert-success d-inline-flex align-items-center" role="alert">
                         <i class="fas fa-check-circle me-2"></i>
@@ -232,7 +231,7 @@ $studentData = $studentSession->getStudentData();
                     <?php else: ?>
                     <div class="alert alert-info d-inline-flex align-items-center" role="alert">
                         <i class="fas fa-info-circle me-2"></i>
-                        <div><a href="#" class="alert-link" data-bs-toggle="modal" data-bs-target="#registerModal">SALI NA!</a> upang subaybayan ang iyong progreso at makakuha ng puntos!</div>
+                        <div><a href="#" class="alert-link" data-bs-toggle="modal" data-bs-target="#registerModal">SALI NA!</a> Hindi kailangan maging IT genius — kailangan mo lang magsimula.</div>
                     </div>
                     <?php endif; ?>
                     <?php if (isset($_GET['error'])): ?>
@@ -250,69 +249,93 @@ $studentData = $studentSession->getStudentData();
         </div>
     </section>
 
-    <!-- Topics Grid -->
-    <section class="py-5">
-        <div class="container">
-            <h5 class="text-center mb-5 fw-bold">"Para maintindihan mo ang isang komplikadong bagay, intidihin mo muna ang pinaka-maliit na parte nito." - <i>John Louis Uru</i></h5>
-            <div class="row">
-                <?php foreach($topics as $index => $topic): 
-                    // Calculate progress if logged in
-                    $progress = 0;
-                    if ($studentSession->isLoggedIn()) {
-                        $progressQuery = "SELECT 
-                            COUNT(DISTINCT sp.lesson_id) as completed_lessons,
-                            COUNT(DISTINCT l.id) as total_lessons
-                            FROM lessons l
-                            LEFT JOIN student_progress sp ON l.id = sp.lesson_id 
-                                AND sp.student_id = ? 
-                                AND sp.is_completed = 1
-                            WHERE l.topic_id = ? 
-                            AND l.is_active = 1";
-                        $progressStmt = $conn->prepare($progressQuery);
-                        $progressStmt->execute([$studentSession->getStudentId(), $topic['id']]);
-                        $progressData = $progressStmt->fetch(PDO::FETCH_ASSOC);
-                        
-                        if ($progressData && $progressData['total_lessons'] > 0) {
-                            $progress = round(($progressData['completed_lessons'] / $progressData['total_lessons']) * 100);
-                        }
+   <!-- Topics Grid -->
+<section class="py-5">
+    <div class="container">
+        <h5 class="text-center mb-5 fw-bold">"Para maintindihan mo ang isang komplikadong bagay, intidihin mo muna ang pinaka-maliit na parte nito." - <i>John Louis Uru</i></h5>
+        <div class="row">
+            <?php foreach($topics as $index => $topic): 
+                // Calculate progress if logged in
+                $progress = 0;
+                $completedLessons = 0;
+                $totalLessons = 0;
+                
+                if ($studentSession->isLoggedIn()) {
+                    $progressQuery = "SELECT 
+                        COUNT(DISTINCT sp.lesson_id) as completed_lessons,
+                        COUNT(DISTINCT l.id) as total_lessons
+                        FROM lessons l
+                        LEFT JOIN student_progress sp ON l.id = sp.lesson_id 
+                            AND sp.student_id = ? 
+                            AND sp.is_completed = 1
+                        WHERE l.topic_id = ? 
+                        AND l.is_active = 1";
+                    $progressStmt = $conn->prepare($progressQuery);
+                    $progressStmt->execute([$studentSession->getStudentId(), $topic['id']]);
+                    $progressData = $progressStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($progressData && $progressData['total_lessons'] > 0) {
+                        $completedLessons = $progressData['completed_lessons'];
+                        $totalLessons = $progressData['total_lessons'];
+                        $progress = round(($completedLessons / $totalLessons) * 100);
                     }
-                ?>
-                <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="topic-card bg-white p-4">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <div class="topic-icon">
-                                    <?php 
-                                    $icons = ['fa-code', 'fa-book', 'fa-terminal', 'fa-vial', 'fa-list', 'fa-filter', 'fa-redo'];
-                                    echo '<i class="fas ' . $icons[$index % count($icons)] . '"></i>';
-                                    ?>
-                                </div>
-                                <h4 class="fw-bold"><?php echo htmlspecialchars($topic['topic_name']); ?></h4>
-                                <p class="text-muted mb-3"><?php echo htmlspecialchars($topic['description'] ?? 'Learn with interactive examples'); ?></p>
+                }
+            ?>
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="topic-card bg-white p-4 d-flex flex-column h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <div class="topic-icon">
+                                <?php 
+                                $icons = ['fa-code', 'fa-book', 'fa-terminal', 'fa-vial', 'fa-list', 'fa-filter', 'fa-redo'];
+                                echo '<i class="fas ' . $icons[$index % count($icons)] . '"></i>';
+                                ?>
                             </div>
-                            <div class="progress-ring">
-                                <svg viewBox="0 0 36 36">
-                                    <path class="progress-ring-circle"
-                                        d="M18 2.0845
-                                        a 15.9155 15.9155 0 0 1 0 31.831
-                                        a 15.9155 15.9155 0 0 1 0 -31.831"
-                                        stroke-dasharray="<?php echo $progress; ?>, 100">
-                                </svg>
-                                <span class="progress-ring-text">
-                                    <?php echo $progress; ?>%
-                                </span>
+                            <h4 class="fw-bold mt-2"><?php echo htmlspecialchars($topic['topic_name']); ?></h4>
+                            <p class="text-muted mb-2"><?php echo htmlspecialchars($topic['description'] ?? 'Learn with interactive examples'); ?></p>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress Bar Section -->
+                    <div class="mt-auto">
+                        <div class="progress-info mb-2 d-flex justify-content-between">
+                            <small class="text-muted">Progress</small>
+                            <small class="fw-bold <?php echo $progress == 100 ? 'text-success' : 'text-primary'; ?>">
+                                <?php echo $progress; ?>%
+                            </small>
+                        </div>
+                        
+                        <!-- Progress Bar -->
+                        <div class="progress" style="height: 8px; border-radius: 4px;">
+                            <div class="progress-bar <?php echo $progress == 100 ? 'bg-success' : ''; ?>"
+                                 role="progressbar" 
+                                 style="width: <?php echo $progress; ?>%;"
+                                 aria-valuenow="<?php echo $progress; ?>" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
                             </div>
                         </div>
-                        <a href="lesson?topic_id=<?php echo $topic['id']; ?>" class="btn btn-primary w-100">
-                            <?php echo $progress > 0 ? 'Revisit Lesson!' : 'Let`s Start!'; ?> 
-                            <i class="fas fa-arrow-right ms-2"></i>
-                        </a>
+                        
+                        <!-- Progress Text -->
+                        <div class="progress-details mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-check-circle me-1 <?php echo $progress == 100 ? 'text-success' : 'text-primary'; ?>"></i>
+                                <?php echo $completedLessons; ?> of <?php echo $totalLessons; ?> lessons completed
+                            </small>
+                        </div>
                     </div>
+                    
+                    <!-- Button -->
+                    <a href="lesson?topic_id=<?php echo $topic['id']; ?>" class="btn btn-primary w-100 mt-3">
+                        <?php echo $progress > 0 ? 'Revisit Lesson!' : 'Let`s Start!'; ?> 
+                        <i class="fas fa-arrow-right ms-2"></i>
+                    </a>
                 </div>
-                <?php endforeach; ?>
             </div>
+            <?php endforeach; ?>
         </div>
-    </section>
+    </div>
+</section>
 
     <!-- Features Section -->
     <section class="py-5 bg-white">
@@ -445,7 +468,7 @@ $studentData = $studentSession->getStudentData();
                     <p class="text-white">An interactive learning platform for mastering JavaScript</p>
                 </div>
                 <div class="col-md-6 text-md-end">
-                    <p class="text-white mb-0">&copy; 2024 JS Tutorial. All rights reserved.</p>
+                    <p class="text-white mb-0">&copy; 2026 URUScript Tutorial. All rights reserved.</p>
                 </div>
             </div>
         </div>
@@ -627,78 +650,256 @@ $studentData = $studentSession->getStudentData();
         }
         
         // Show quiz statistics
-        function showQuizStats() {
-            const modal = new bootstrap.Modal(document.getElementById('quizStatsModal'));
-            modal.show();
-            
-            // Load statistics via AJAX
-            $.ajax({
-                url: 'ajax.php?action=get_quiz_stats',
-                type: 'GET',
-                dataType: 'json',
-                success: function(stats) {
-                    if (stats && !stats.error) {
-                        const statsHtml = `
-                            <div class="row text-center mb-4">
-                                <div class="col-6">
-                                    <div class="display-6 fw-bold text-primary">${stats.correct_attempts || 0}</div>
-                                    <small class="text-muted">Correct Answers</small>
-                                </div>
-                                <div class="col-6">
-                                    <div class="display-6 fw-bold text-success">${stats.accuracy_rate || 0}%</div>
-                                    <small class="text-muted">Accuracy Rate</small>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Total Quiz Attempts</label>
-                                <div class="progress" style="height: 25px;">
-                                    <div class="progress-bar bg-success" style="width: ${stats.accuracy_rate || 0}%">
-                                        ${stats.correct_attempts || 0} correct
-                                    </div>
-                                    <div class="progress-bar bg-danger" style="width: ${100 - (stats.accuracy_rate || 0)}%">
-                                        ${stats.incorrect_attempts || 0} incorrect
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-6">
-                                    <div class="card bg-light">
-                                        <div class="card-body text-center">
-                                            <div class="h4 mb-0">${stats.total_attempts || 0}</div>
-                                            <small>Total Attempts</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="card bg-light">
-                                        <div class="card-body text-center">
-                                            <div class="h4 mb-0">${Math.round(stats.avg_time_spent || 0)}s</div>
-                                            <small>Avg. Time/Question</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                        $('#quizStatsContent').html(statsHtml);
-                    } else {
-                        $('#quizStatsContent').html(`
-                            <div class="alert alert-info">
-                                <i class="fas fa-info-circle me-2"></i>
-                                ${stats && stats.error ? stats.error : 'No quiz statistics available yet. Start learning to track your progress!'}
-                            </div>
-                        `);
-                    }
-                },
-                error: function() {
-                    $('#quizStatsContent').html(`
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-circle me-2"></i>
-                            Failed to load statistics. Please try again.
-                        </div>
-                    `);
+       // Update the showQuizStats() function
+function showQuizStats() {
+    const modal = new bootstrap.Modal(document.getElementById('quizStatsModal'));
+    modal.show();
+    
+    // Load statistics via AJAX
+    $.ajax({
+        url: 'ajax.php?action=get_quiz_stats',
+        type: 'GET',
+        dataType: 'json',
+        success: function(stats) {
+            if (stats && !stats.error) {
+                // Calculate remaining lessons
+                const remainingLessons = stats.total_active_lessons - stats.total_finished_lessons;
+                
+                // Check if all topics are completed
+                let allTopicsCompleted = true;
+                if (stats.topics_progress && stats.topics_progress.length > 0) {
+                    stats.topics_progress.forEach(topic => {
+                        if (topic.total_lessons > 0 && topic.completed_lessons !== topic.total_lessons) {
+                            allTopicsCompleted = false;
+                        }
+                    });
                 }
-            });
+                
+                const statsHtml = `
+                    <!-- Stats Overview Cards -->
+                    <div class="row text-center mb-4">
+                        <!-- Quiz Accuracy -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card border-primary h-100">
+                                <div class="card-body">
+                                    <i class="fas fa-chart-line fa-2x text-primary mb-3"></i>
+                                    <div class="display-6 fw-bold text-primary">${stats.accuracy_rate || 0}%</div>
+                                    <small class="text-muted">Quiz Accuracy</small>
+                                    <div class="mt-2">
+                                        <small class="text-muted">${stats.correct_attempts || 0}/${stats.total_attempts || 0} correct</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Lessons Completed -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card border-success h-100">
+                                <div class="card-body">
+                                    <i class="fas fa-book fa-2x text-success mb-3"></i>
+                                    <div class="display-6 fw-bold text-success">${stats.total_finished_lessons || 0}</div>
+                                    <small class="text-muted">Lessons Completed</small>
+                                    <div class="mt-2">
+                                        <small class="text-muted">${stats.lessons_completion_rate || 0}% of all lessons</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Avg Time Per Question -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card border-info h-100">
+                                <div class="card-body">
+                                    <i class="fas fa-clock fa-2x text-info mb-3"></i>
+                                    <div class="display-6 fw-bold text-info">${Math.round(stats.avg_time_spent || 0)}s</div>
+                                    <small class="text-muted">Avg. Time/Question</small>
+                                    <div class="mt-2">
+                                        <small class="text-muted">Total attempts: ${stats.total_attempts || 0}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Lessons Progress Section -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">
+                                <i class="fas fa-graduation-cap me-2"></i>Overall Learning Progress
+                            </h6>
+                            <span class="badge ${stats.lessons_completion_rate >= 100 ? 'bg-success' : 'bg-primary'}">
+                                ${stats.lessons_completion_rate || 0}%
+                            </span>
+                        </div>
+                        
+                        <!-- Main Progress Bar -->
+                        <div class="progress mb-3" style="height: 20px;">
+                            <div class="progress-bar ${stats.lessons_completion_rate >= 100 ? 'bg-success' : 'bg-primary'} 
+                                 ${stats.lessons_completion_rate < 100 ? 'progress-bar-striped progress-bar-animated' : ''}" 
+                                 style="width: ${stats.lessons_completion_rate || 0}%">
+                                <span class="fw-bold">${stats.lessons_completion_rate || 0}%</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Lessons Counter -->
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="h5 fw-bold text-success">${stats.total_finished_lessons || 0}</div>
+                                <small class="text-muted">Completed</small>
+                            </div>
+                            <div class="col-4">
+                                <div class="h5 fw-bold ${remainingLessons > 0 ? 'text-warning' : 'text-success'}">
+                                    ${remainingLessons >= 0 ? remainingLessons : 0}
+                                </div>
+                                <small class="text-muted">Remaining</small>
+                            </div>
+                            <div class="col-4">
+                                <div class="h5 fw-bold text-primary">${stats.total_active_lessons || 0}</div>
+                                <small class="text-muted">Total Lessons</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Quiz Performance Breakdown -->
+                    <div class="mb-4">
+                        <h6 class="mb-3">
+                            <i class="fas fa-chart-pie me-2"></i>Quiz Performance Breakdown
+                        </h6>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>${stats.total_attempts || 0} Total Attempts</span>
+                                <span>${stats.accuracy_rate || 0}% Accuracy</span>
+                            </div>
+                            <div class="progress" style="height: 25px;">
+                                <div class="progress-bar bg-success" style="width: ${stats.accuracy_rate || 0}%">
+                                    ${stats.correct_attempts || 0} Correct
+                                </div>
+                                <div class="progress-bar bg-danger" style="width: ${100 - (stats.accuracy_rate || 0)}%">
+                                    ${stats.incorrect_attempts || 0} Incorrect
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Topic-wise Progress -->
+                    ${stats.topics_progress && stats.topics_progress.length > 0 ? `
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">
+                                <i class="fas fa-layer-group me-2"></i>Topic-wise Progress
+                            </h6>
+                            <span class="badge bg-primary">${stats.topics_progress.length} Topics</span>
+                        </div>
+                        
+                        <div class="accordion" id="topicsAccordion">
+                            ${stats.topics_progress.map((topic, index) => {
+                                const topicProgress = topic.total_lessons > 0 ? 
+                                    Math.round((topic.completed_lessons / topic.total_lessons) * 100) : 0;
+                                const isComplete = topicProgress === 100;
+                                
+                                return `
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="heading${index}">
+                                        <button class="accordion-button ${index > 0 ? 'collapsed' : ''}" 
+                                                type="button" data-bs-toggle="collapse" 
+                                                data-bs-target="#collapse${index}" 
+                                                aria-expanded="${index === 0 ? 'true' : 'false'}" 
+                                                aria-controls="collapse${index}">
+                                            <div class="d-flex w-100 align-items-center">
+                                                <div class="me-3">
+                                                    <i class="fas ${isComplete ? 'fa-check-circle text-success' : 'fa-book text-primary'}"></i>
+                                                </div>
+                                                <div class="flex-grow-1">
+                                                    <strong>${topic.topic_name}</strong>
+                                                    <div class="progress mt-1" style="height: 6px;">
+                                                        <div class="progress-bar ${isComplete ? 'bg-success' : ''}" 
+                                                             style="width: ${topicProgress}%"></div>
+                                                    </div>
+                                                </div>
+                                                <div class="ms-2">
+                                                    <span class="badge ${isComplete ? 'bg-success' : 'bg-primary'}">
+                                                        ${topic.completed_lessons}/${topic.total_lessons}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </button>
+                                    </h2>
+                                    <div id="collapse${index}" 
+                                         class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" 
+                                         aria-labelledby="heading${index}" 
+                                         data-bs-parent="#topicsAccordion">
+                                        <div class="accordion-body">
+                                            <div class="row">
+                                                <div class="col-6">
+                                                    <small class="text-muted">Progress:</small>
+                                                    <div class="h5 ${isComplete ? 'text-success' : 'text-primary'}">
+                                                        ${topicProgress}%
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <small class="text-muted">Status:</small>
+                                                    <div>
+                                                        <span class="badge ${isComplete ? 'bg-success' : 'bg-warning'}">
+                                                            ${isComplete ? 'Complete' : 'In Progress'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            ${!isComplete ? `
+                                            <div class="mt-2">
+                                                <small class="text-muted">
+                                                    ${topic.total_lessons - topic.completed_lessons} lesson(s) remaining
+                                                </small>
+                                            </div>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                    ` : ''}
+                    
+                    <!-- Achievement Badge -->
+                    ${stats.lessons_completion_rate >= 100 ? `
+                    <div class="alert alert-success text-center">
+                        <i class="fas fa-trophy fa-2x me-2"></i>
+                        <strong>Congratulations! You've completed all available lessons!</strong>
+                        <div class="mt-2">
+                            <small>Keep up the great work! Consider reviewing completed topics to reinforce your learning.</small>
+                        </div>
+                    </div>
+                    ` : allTopicsCompleted ? `
+                    <div class="alert alert-info text-center">
+                        <i class="fas fa-star fa-2x me-2"></i>
+                        <strong>Great job! You've completed all topics!</strong>
+                        <div class="mt-2">
+                            <small>You've finished all available lessons in every topic. Excellent progress!</small>
+                        </div>
+                    </div>
+                    ` : ''}
+                `;
+                $('#quizStatsContent').html(statsHtml);
+            } else {
+                $('#quizStatsContent').html(`
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        ${stats && stats.error ? stats.error : 'No statistics available yet. Start learning to track your progress!'}
+                    </div>
+                `);
+            }
+        },
+        error: function() {
+            $('#quizStatsContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    Failed to load statistics. Please try again.
+                </div>
+            `);
         }
+    });
+}
         
         // Auto-close modals on success
         $(document).ajaxSuccess(function(event, xhr, settings) {
