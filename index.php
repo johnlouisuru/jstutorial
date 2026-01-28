@@ -367,7 +367,7 @@ $studentData = $studentSession->getStudentData();
     </section>
 
     <!-- Login Modal -->
-    <div class="modal fade" id="loginModal" tabindex="-1">
+    <div class="modal fade " id="loginModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header border-0">
@@ -435,7 +435,7 @@ $studentData = $studentSession->getStudentData();
     </div>
 
     <!-- Quiz Statistics Modal -->
-    <div class="modal fade" id="quizStatsModal" tabindex="-1">
+    <div class="modal fade modal-lg" id="quizStatsModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header bg-info text-white">

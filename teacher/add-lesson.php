@@ -60,9 +60,13 @@ $topics_query = "SELECT id, topic_name FROM topics WHERE is_active = 1 AND delet
 $topics = $conn->query($topics_query)->fetchAll(PDO::FETCH_ASSOC);
 
 // Function to save lesson
+// Function to save lesson
 function saveLesson($conn, $data) {
     try {
         $conn->beginTransaction();
+        
+        // Get lesson_code_run from data or default to empty string
+        $lesson_code_run = isset($data['lesson_code_run']) ? $data['lesson_code_run'] : '';
         
         if (isset($data['lesson_id']) && $data['lesson_id']) {
             // Update existing lesson
@@ -70,6 +74,7 @@ function saveLesson($conn, $data) {
                       topic_id = :topic_id,
                       lesson_title = :lesson_title,
                       lesson_content = :lesson_content,
+                      lesson_code_run = :lesson_code_run,
                       lesson_order = :lesson_order,
                       content_type = :content_type,
                       is_active = :is_active
@@ -79,8 +84,8 @@ function saveLesson($conn, $data) {
             $stmt->bindParam(':lesson_id', $data['lesson_id']);
         } else {
             // Insert new lesson
-            $query = "INSERT INTO lessons (topic_id, lesson_title, lesson_content, lesson_order, content_type, is_active) 
-                      VALUES (:topic_id, :lesson_title, :lesson_content, :lesson_order, :content_type, :is_active)";
+            $query = "INSERT INTO lessons (topic_id, lesson_title, lesson_content, lesson_code_run, lesson_order, content_type, is_active) 
+                      VALUES (:topic_id, :lesson_title, :lesson_content, :lesson_code_run, :lesson_order, :content_type, :is_active)";
             
             $stmt = $conn->prepare($query);
         }
@@ -88,6 +93,7 @@ function saveLesson($conn, $data) {
         $stmt->bindParam(':topic_id', $data['topic_id']);
         $stmt->bindParam(':lesson_title', $data['lesson_title']);
         $stmt->bindParam(':lesson_content', $data['lesson_content']);
+        $stmt->bindParam(':lesson_code_run', $lesson_code_run);
         $stmt->bindParam(':lesson_order', $data['lesson_order']);
         $stmt->bindParam(':content_type', $data['content_type']);
         $stmt->bindParam(':is_active', $data['is_active']);
@@ -220,6 +226,7 @@ function getTopicLessons($conn, $topic_id) {
     }
 }
 
+// Function to get lesson data
 // Function to get lesson data
 function getLessonData($conn, $lesson_id) {
     try {
@@ -1010,6 +1017,9 @@ function getLessonImages($conn, $lesson_id) {
                                 <button type="button" class="editor-btn" onclick="clearFormatting()">
                                     <i class="fas fa-eraser"></i> Clear
                                 </button>
+                                <button type="button" class="editor-btn" onclick="insertSampleCode()">
+                                    <i class="fas fa-play-circle"></i> Sample Code
+                                </button>
                             </div>
                             
                             <!-- Content Editor -->
@@ -1027,6 +1037,13 @@ function getLessonImages($conn, $lesson_id) {
                             
                             <!-- Hidden textarea for form submission -->
                             <textarea class="d-none" id="lessonContentText"></textarea>
+                            <!-- After the existing textarea, add this: -->
+                            <hr />
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Run Code (Optional)</label>
+                                <small class="form-text text-muted d-block mb-2">Code that will appear in the lesson viewer's "Try It" section</small>
+                                <textarea class="form-control" id="lessonCodeRun" rows="5" placeholder="// Example: console.log('Hello World');"></textarea>
+                            </div>
                             
                             <!-- Image Upload Modal -->
                             <div class="modal fade" id="imageUploadModal">
@@ -1482,6 +1499,22 @@ function insertImage() {
         if (container) container.remove();
         showToast('Failed to upload image', 'danger');
     });
+}
+
+// Insert sample run code
+function insertSampleCode() {
+    const sampleCode = `// Try running this code!
+let greeting = "Hello, World!";
+console.log(greeting);
+
+// You can modify the code and run it:
+let x = 5;
+let y = 10;
+let result = x + y;
+console.log("Result: " + result);`;
+    
+    document.getElementById('lessonCodeRun').value = sampleCode;
+    showToast('Sample code inserted', 'success');
 }
 
 // Show image options (for overlay click)
@@ -1958,62 +1991,66 @@ setTimeout(processExistingImages, 100);
         }
         
         // Edit lesson
-        function editLesson(lessonId) {
-            fetch('add-lesson.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `action=get_lesson_data&lesson_id=${lessonId}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    currentLessonId = lessonId;
-                    
-                    // Fill lesson form
-                    document.getElementById('topicSelect').value = data.lesson.topic_id;
-                    document.getElementById('lessonOrder').value = data.lesson.lesson_order;
-                    document.getElementById('lessonTitle').value = data.lesson.lesson_title;
-                    
-                    // Set content type
-                    document.querySelector(`input[name="contentType"][value="${data.lesson.content_type}"]`).checked = true;
-                    
-                    // Set active status
-                    document.getElementById('lessonActive').checked = data.lesson.is_active == 1;
-                    
-                    // Set lesson content
-                    document.getElementById('lessonContent').innerHTML = data.lesson.lesson_content;
-                    setTimeout(processExistingImages, 100);
-                    updateContent();
-                    
-                    // Load quiz data if exists
-                    if (data.quiz) {
-                        currentQuizId = data.quiz.id;
-                        document.getElementById('quizQuestion').value = data.quiz.question;
-                        document.getElementById('quizExplanation').value = data.quiz.explanation || '';
-                        document.querySelector(`input[name="difficulty"][value="${data.quiz.difficulty}"]`).checked = true;
-                        
-                        // Clear and add quiz options
-                        document.getElementById('quizOptionsContainer').innerHTML = '';
-                        data.options.forEach((option, index) => {
-                            addQuizOption(option.option_text, option.is_correct == 1);
-                        });
-                    } else {
-                        currentQuizId = null;
-                        document.getElementById('quizQuestion').value = '';
-                        document.getElementById('quizExplanation').value = '';
-                    }
-                    
-                    showToast('Lesson loaded for editing', 'success');
-                    
-                    // Load lessons for this topic
-                    loadTopicLessons();
-                } else {
-                    showToast('Error loading lesson: ' + data.message, 'danger');
-                }
-            });
+        // Edit lesson - UPDATED to load lesson_code_run
+function editLesson(lessonId) {
+    fetch('add-lesson.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `action=get_lesson_data&lesson_id=${lessonId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            currentLessonId = lessonId;
+            
+            // Fill lesson form
+            document.getElementById('topicSelect').value = data.lesson.topic_id;
+            document.getElementById('lessonOrder').value = data.lesson.lesson_order;
+            document.getElementById('lessonTitle').value = data.lesson.lesson_title;
+            
+            // Set content type
+            document.querySelector(`input[name="contentType"][value="${data.lesson.content_type}"]`).checked = true;
+            
+            // Set active status
+            document.getElementById('lessonActive').checked = data.lesson.is_active == 1;
+            
+            // Set lesson content
+            document.getElementById('lessonContent').innerHTML = data.lesson.lesson_content;
+            setTimeout(processExistingImages, 100);
+            updateContent();
+            
+            // Set lesson code run
+            document.getElementById('lessonCodeRun').value = data.lesson.lesson_code_run || '';
+            
+            // Load quiz data if exists
+            if (data.quiz) {
+                currentQuizId = data.quiz.id;
+                document.getElementById('quizQuestion').value = data.quiz.question;
+                document.getElementById('quizExplanation').value = data.quiz.explanation || '';
+                document.querySelector(`input[name="difficulty"][value="${data.quiz.difficulty}"]`).checked = true;
+                
+                // Clear and add quiz options
+                document.getElementById('quizOptionsContainer').innerHTML = '';
+                data.options.forEach((option, index) => {
+                    addQuizOption(option.option_text, option.is_correct == 1);
+                });
+            } else {
+                currentQuizId = null;
+                document.getElementById('quizQuestion').value = '';
+                document.getElementById('quizExplanation').value = '';
+            }
+            
+            showToast('Lesson loaded for editing', 'success');
+            
+            // Load lessons for this topic
+            loadTopicLessons();
+        } else {
+            showToast('Error loading lesson: ' + data.message, 'danger');
         }
+    });
+}
         
         // Delete lesson
         function deleteLesson(lessonId) {
@@ -2043,6 +2080,7 @@ setTimeout(processExistingImages, 100);
         }
         
 // Save lesson - FIXED VERSION with HTML cleaning
+// Save lesson - UPDATED to include lessonCodeRun
 function saveLesson() {
     // Validate required fields
     const topicId = document.getElementById('topicSelect').value;
@@ -2090,6 +2128,9 @@ function saveLesson() {
     const editorContent = document.getElementById('lessonContent');
     const cleanedContent = cleanLessonContent(editorContent.innerHTML);
     
+    // Get run code
+    const lessonCodeRun = document.getElementById('lessonCodeRun').value.trim();
+    
     // Prepare data
     const formData = new FormData();
     formData.append('action', 'save_lesson');
@@ -2097,6 +2138,7 @@ function saveLesson() {
     formData.append('topic_id', topicId);
     formData.append('lesson_title', lessonTitle);
     formData.append('lesson_content', cleanedContent); // Use cleaned content
+    formData.append('lesson_code_run', lessonCodeRun); // Add run code
     formData.append('lesson_order', lessonOrder);
     formData.append('content_type', document.querySelector('input[name="contentType"]:checked').value);
     formData.append('is_active', document.getElementById('lessonActive').checked ? 1 : 0);
@@ -2212,45 +2254,54 @@ function saveLesson() {
             previewWindow.document.close();
         }
         
-        // Load sample lesson
-        function loadSampleLesson() {
-            if (!confirm('Load sample lesson? This will replace current content.')) return;
-            
-            document.getElementById('lessonTitle').value = 'JavaScript Variables and Data Types';
-            
-            const sampleContent = `
-                <h3 class="fw-bold mb-3">Introduction to Variables</h3>
-                
-                <p>In JavaScript, variables are containers for storing data values. You can declare variables using three different keywords:</p>
-                
-                <ul>
-                    <li><code>var</code> - Function scoped (older way)</li>
-                    <li><code>let</code> - Block scoped (modern way)</li>
-                    <li><code>const</code> - Block scoped, cannot be reassigned</li>
-                </ul>
-                
-                <div class="alert alert-info">
-                    <div class="d-flex align-items-start">
-                        <i class="fas fa-lightbulb me-3 mt-1 fa-lg"></i>
-                        <div>
-                            <h5 class="alert-heading">Best Practice</h5>
-                            <p class="mb-0">Use <code>const</code> by default, <code>let</code> when you need to reassign, and avoid <code>var</code> in modern JavaScript.</p>
-                        </div>
-                    </div>
+        // Load sample lesson - UPDATED to include sample run code
+function loadSampleLesson() {
+    if (!confirm('Load sample lesson? This will replace current content.')) return;
+    
+    document.getElementById('lessonTitle').value = 'JavaScript Variables and Data Types';
+    document.getElementById('lessonCodeRun').value = `// Try running this code!
+let message = "Hello, JavaScript!";
+console.log(message);
+
+// You can also try:
+let number1 = 5;
+let number2 = 10;
+let sum = number1 + number2;
+console.log("The sum is: " + sum);`;
+    
+    const sampleContent = `
+        <h3 class="fw-bold mb-3">Introduction to Variables</h3>
+        
+        <p>In JavaScript, variables are containers for storing data values. You can declare variables using three different keywords:</p>
+        
+        <ul>
+            <li><code>var</code> - Function scoped (older way)</li>
+            <li><code>let</code> - Block scoped (modern way)</li>
+            <li><code>const</code> - Block scoped, cannot be reassigned</li>
+        </ul>
+        
+        <div class="alert alert-info">
+            <div class="d-flex align-items-start">
+                <i class="fas fa-lightbulb me-3 mt-1 fa-lg"></i>
+                <div>
+                    <h5 class="alert-heading">Best Practice</h5>
+                    <p class="mb-0">Use <code>const</code> by default, <code>let</code> when you need to reassign, and avoid <code>var</code> in modern JavaScript.</p>
                 </div>
-                
-                <h4 class="fw-bold mb-2">Data Types</h4>
-                
-                <p>JavaScript has several primitive data types:</p>
-                
-                <div class="code-snippet">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <small class="text-muted">JavaScript Data Types</small>
-                        <button class="btn btn-sm btn-outline-light" onclick="copyCode(this)">
-                            <i class="fas fa-copy"></i> Copy
-                        </button>
-                    </div>
-                    <pre class="mb-0"><code>// String
+            </div>
+        </div>
+        
+        <h4 class="fw-bold mb-2">Data Types</h4>
+        
+        <p>JavaScript has several primitive data types:</p>
+        
+        <div class="code-snippet">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <small class="text-muted">JavaScript Data Types</small>
+                <button class="btn btn-sm btn-outline-light" onclick="copyCode(this)">
+                    <i class="fas fa-copy"></i> Copy
+                </button>
+            </div>
+            <pre class="mb-0"><code>// String
 let name = "John Doe";
 
 // Number
@@ -2271,40 +2322,40 @@ let sym = Symbol('id');
 
 // BigInt (ES2020)
 let bigNumber = 9007199254740991n;</code></pre>
+        </div>
+        
+        <div class="alert alert-warning">
+            <div class="d-flex align-items-start">
+                <i class="fas fa-exclamation-triangle me-3 mt-1 fa-lg"></i>
+                <div>
+                    <h5 class="alert-heading">Important Note</h5>
+                    <p class="mb-0">JavaScript is dynamically typed, meaning you don't need to specify the data type when declaring a variable.</p>
                 </div>
-                
-                <div class="alert alert-warning">
-                    <div class="d-flex align-items-start">
-                        <i class="fas fa-exclamation-triangle me-3 mt-1 fa-lg"></i>
-                        <div>
-                            <h5 class="alert-heading">Important Note</h5>
-                            <p class="mb-0">JavaScript is dynamically typed, meaning you don't need to specify the data type when declaring a variable.</p>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            document.getElementById('lessonContent').innerHTML = sampleContent;
-            updateContent();
-            
-            // Set sample quiz
-            document.getElementById('quizQuestion').value = 'Which keyword is used to declare a variable that cannot be reassigned?';
-            document.getElementById('quizExplanation').value = 'The const keyword creates a constant reference to a value. The variable identifier cannot be reassigned, but the value itself can be mutable (like objects or arrays).';
-            
-            // Clear and add sample quiz options
-            document.getElementById('quizOptionsContainer').innerHTML = '';
-            addQuizOption('var', false);
-            addQuizOption('let', false);
-            addQuizOption('const', true);
-            addQuizOption('static', false);
-            
-            // Mark the correct answer
-            setTimeout(() => {
-                markCorrect('option2');
-            }, 100);
-            
-            showToast('Sample lesson loaded', 'success');
-        }
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('lessonContent').innerHTML = sampleContent;
+    updateContent();
+    
+    // Set sample quiz
+    document.getElementById('quizQuestion').value = 'Which keyword is used to declare a variable that cannot be reassigned?';
+    document.getElementById('quizExplanation').value = 'The const keyword creates a constant reference to a value. The variable identifier cannot be reassigned, but the value itself can be mutable (like objects or arrays).';
+    
+    // Clear and add sample quiz options
+    document.getElementById('quizOptionsContainer').innerHTML = '';
+    addQuizOption('var', false);
+    addQuizOption('let', false);
+    addQuizOption('const', true);
+    addQuizOption('static', false);
+    
+    // Mark the correct answer
+    setTimeout(() => {
+        markCorrect('option2');
+    }, 100);
+    
+    showToast('Sample lesson loaded', 'success');
+}
         
         // Duplicate current lesson
         function duplicateLesson() {
@@ -2322,26 +2373,28 @@ let bigNumber = 9007199254740991n;</code></pre>
         }
         
         // Clear form
-        function clearForm() {
-            if (!confirm('Clear all form data? This cannot be undone.')) return;
-            
-            document.getElementById('lessonTitle').value = '';
-            document.getElementById('lessonOrder').value = 1;
-            document.getElementById('lessonContent').innerHTML = '<p>Start writing your lesson content here...</p>';
-            document.getElementById('quizQuestion').value = '';
-            document.getElementById('quizExplanation').value = '';
-            document.getElementById('quizOptionsContainer').innerHTML = '';
-            
-            currentLessonId = null;
-            currentQuizId = null;
-            
-            // Add default options
-            addQuizOption();
-            addQuizOption();
-            
-            updateContent();
-            showToast('Form cleared', 'info');
-        }
+        // Clear form - UPDATED to clear lessonCodeRun
+function clearForm() {
+    if (!confirm('Clear all form data? This cannot be undone.')) return;
+    
+    document.getElementById('lessonTitle').value = '';
+    document.getElementById('lessonOrder').value = 1;
+    document.getElementById('lessonContent').innerHTML = '<p>Start writing your lesson content here...</p>';
+    document.getElementById('lessonCodeRun').value = ''; // Clear run code
+    document.getElementById('quizQuestion').value = '';
+    document.getElementById('quizExplanation').value = '';
+    document.getElementById('quizOptionsContainer').innerHTML = '';
+    
+    currentLessonId = null;
+    currentQuizId = null;
+    
+    // Add default options
+    addQuizOption();
+    addQuizOption();
+    
+    updateContent();
+    showToast('Form cleared', 'info');
+}
         
         // Copy code function for preview
         function copyCode(button) {
@@ -2361,6 +2414,7 @@ let bigNumber = 9007199254740991n;</code></pre>
         }
         
        // Also update the saveDraft function to use cleaned content
+// Also update the saveDraft function to include lessonCodeRun
 function saveDraft() {
     const editorContent = document.getElementById('lessonContent');
     const cleanedContent = cleanLessonContent(editorContent.innerHTML);
@@ -2369,6 +2423,7 @@ function saveDraft() {
         topic_id: document.getElementById('topicSelect').value,
         lesson_title: document.getElementById('lessonTitle').value,
         lesson_content: cleanedContent, // Use cleaned content
+        lesson_code_run: document.getElementById('lessonCodeRun').value, // Add run code
         lesson_order: document.getElementById('lessonOrder').value,
         content_type: document.querySelector('input[name="contentType"]:checked').value,
         is_active: document.getElementById('lessonActive').checked,
@@ -2444,36 +2499,37 @@ function cleanupUnusedImages() {
     }
 }
 
-        // Load draft from localStorage
-        function loadDraft() {
-            const draft = localStorage.getItem('lesson_draft');
+        // Load draft from localStorage - UPDATED to load lessonCodeRun
+function loadDraft() {
+    const draft = localStorage.getItem('lesson_draft');
+    
+    if (draft) {
+        if (confirm('You have a saved draft. Would you like to load it?')) {
+            const data = JSON.parse(draft);
             
-            if (draft) {
-                if (confirm('You have a saved draft. Would you like to load it?')) {
-                    const data = JSON.parse(draft);
-                    
-                    document.getElementById('topicSelect').value = data.topic_id || '';
-                    document.getElementById('lessonTitle').value = data.lesson_title || '';
-                    document.getElementById('lessonContent').innerHTML = data.lesson_content || '';
-                    document.getElementById('lessonOrder').value = data.lesson_order || 1;
-                    
-                    if (data.content_type) {
-                        document.querySelector(`input[name="contentType"][value="${data.content_type}"]`).checked = true;
-                    }
-                    
-                    document.getElementById('lessonActive').checked = data.is_active || false;
-                    document.getElementById('quizQuestion').value = data.quiz_question || '';
-                    document.getElementById('quizExplanation').value = data.quiz_explanation || '';
-                    
-                    if (data.difficulty) {
-                        document.querySelector(`input[name="difficulty"][value="${data.difficulty}"]`).checked = true;
-                    }
-                    
-                    updateContent();
-                    showToast('Draft loaded', 'success');
-                }
+            document.getElementById('topicSelect').value = data.topic_id || '';
+            document.getElementById('lessonTitle').value = data.lesson_title || '';
+            document.getElementById('lessonContent').innerHTML = data.lesson_content || '';
+            document.getElementById('lessonCodeRun').value = data.lesson_code_run || ''; // Load run code
+            document.getElementById('lessonOrder').value = data.lesson_order || 1;
+            
+            if (data.content_type) {
+                document.querySelector(`input[name="contentType"][value="${data.content_type}"]`).checked = true;
             }
+            
+            document.getElementById('lessonActive').checked = data.is_active || false;
+            document.getElementById('quizQuestion').value = data.quiz_question || '';
+            document.getElementById('quizExplanation').value = data.quiz_explanation || '';
+            
+            if (data.difficulty) {
+                document.querySelector(`input[name="difficulty"][value="${data.difficulty}"]`).checked = true;
+            }
+            
+            updateContent();
+            showToast('Draft loaded', 'success');
         }
+    }
+}
         
         // Clear draft
         function clearDraft() {

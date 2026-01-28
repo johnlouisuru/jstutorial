@@ -6,7 +6,7 @@ $conn = $db->getConnection();
 $studentSession = new StudentSession($conn);
 
 if (!$studentSession->isLoggedIn()) {
-    header('Location: index.php');
+    header('Location: index');
     exit;
 }
 
@@ -17,7 +17,8 @@ $username = $studentSession->getStudentData()['username'];
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>JavaScript Practice Area | Interactive Learning Platform</title>
+    <link rel="icon" type="image/x-icon" href="assets/img/URUScript.png">
+    <title>URUScript Practice Area | Interactive Learning Platform</title>
     
     <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -288,7 +289,7 @@ $username = $studentSession->getStudentData()['username'];
             </button>
             <div class="d-flex align-items-center">
                 <span class="text-white me-3 d-none d-md-inline">Welcome, <?php echo htmlspecialchars($username); ?></span>
-                <a href="dashboard.php" class="btn btn-sm btn-outline-light">
+                <a href="dashboard" class="btn btn-sm btn-outline-light">
                     <i class="fas fa-arrow-left me-1"></i> Dashboard
                 </a>
             </div>

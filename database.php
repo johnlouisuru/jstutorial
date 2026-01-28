@@ -581,7 +581,7 @@ public function getLearningGoals() {
     
     // Get recommended next lessons based on progress
     $recommendationQuery = "SELECT 
-        l.id, l.lesson_title, l.content_type, t.topic_name,
+        l.id, l.lesson_title, l.content_type, t.topic_name, t.id AS topics_id,
         (SELECT COUNT(*) FROM quizzes q WHERE q.lesson_id = l.id) as quiz_count,
         (SELECT COUNT(*) FROM student_quiz_attempts sqa 
          JOIN quizzes q ON sqa.quiz_id = q.id 

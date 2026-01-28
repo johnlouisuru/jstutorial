@@ -6,7 +6,7 @@ $conn = $db->getConnection();
 $studentSession = new StudentSession($conn);
 
 if (!$studentSession->isLoggedIn()) {
-    header('Location: index.php');
+    header('Location: index');
     exit;
 }
 
@@ -346,7 +346,7 @@ $goals = $studentSession->getLearningGoals();
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm py-3">
         <div class="container">
-            <a class="navbar-brand fw-bold text-primary d-flex align-items-center" href="index.php">
+            <a class="navbar-brand fw-bold text-primary d-flex align-items-center" href="index">
                 <img src="assets/img/URUScript.png" alt="URUScript Logo" width="40" height="40" class="me-2">
                 <span>URUScript</span>
             </a>
@@ -373,10 +373,10 @@ $goals = $studentSession->getLearningGoals();
                                 </span>
                             </li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="index.php">
+                            <li><a class="dropdown-item" href="index">
                                 <i class="fas fa-compass me-2"></i> Explore Topics
                             </a></li>
-                            <li><a class="dropdown-item" href="coding-ground.php">
+                            <li><a class="dropdown-item" href="coding-ground">
                                 <i class="fas fa-code me-2"></i> Code Arena
                             </a></li>
                             <li><a class="dropdown-item" href="#" onclick="showQuizStats()">
@@ -609,7 +609,7 @@ $goals = $studentSession->getLearningGoals();
                                             <div class="fw-bold"><?php echo htmlspecialchars($goal['lesson_title']); ?></div>
                                             <small class="text-muted"><?php echo htmlspecialchars($goal['topic_name']); ?></small>
                                         </div>
-                                        <a href="lesson?topic_id=<?php echo $goal['topic_id'] ?? ''; ?>&lesson_id=<?php echo $goal['id']; ?>" 
+                                        <a href="lesson?topic_id=<?php echo $goal['topics_id'] ?? ''; ?>&lesson_id=<?php echo $goal['id']; ?>" 
                                            class="btn btn-sm btn-primary">
                                             Start
                                         </a>
@@ -687,7 +687,7 @@ $goals = $studentSession->getLearningGoals();
     </div>
 
     <!-- Statistics Modal -->
-    <div class="modal fade" id="quizStatsModal" tabindex="-1">
+    <div class="modal fade modal-lg" id="quizStatsModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
@@ -838,7 +838,7 @@ $goals = $studentSession->getLearningGoals();
                         <div class="text-center py-5">
                             <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
                             <p class="text-muted">No recent activity</p>
-                            <a href="index.php" class="btn btn-primary">Start Learning</a>
+                            <a href="index" class="btn btn-primary">Start Learning</a>
                         </div>
                         `;
                     }
