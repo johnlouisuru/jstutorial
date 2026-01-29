@@ -763,7 +763,7 @@ function exportQuizzes($conn, $data) {
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h2 class="mb-1">
-                    <i class="fas fa-question-circle me-2 text-primary"></i>Manage Quizzes
+                    <img src="../assets/img/URUScript.png" alt="JS Tutorial Logo" width="40" height="40">Manage Quizzes
                 </h2>
                 <p class="text-muted mb-0">View, edit, and analyze all quiz questions</p>
             </div>

@@ -843,9 +843,9 @@ function getLessonImages($conn, $lesson_id) {
         <div class="admin-sidebar">
             <div class="sidebar-header">
                 <h4 class="mb-0">
-                    <i class="fab fa-js-square me-2"></i>JS Tutorial Admin
+                    <img src="../assets/img/URUScript.png" alt="JS Tutorial Logo" width="40" height="40"> Lesson
                 </h4>
-                <small class="text-light opacity-75">Content Management System</small>
+                <small class="text-light opacity-75">Lesson Content</small>
             </div>
             
             <div class="sidebar-nav">

@@ -246,7 +246,7 @@ function reorderTopics($conn, $order) {
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
             <a class="navbar-brand" href="#">
-                <i class="fas fa-chalkboard-teacher me-2"></i> Topics
+                <img src="../assets/img/URUScript.png" alt="JS Tutorial Logo" width="40" height="40"> Topics
             </a>
             <div class="navbar-nav ms-auto">
                 <div class="dropdown">

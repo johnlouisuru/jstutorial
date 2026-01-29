@@ -30,7 +30,7 @@ $avatarColor = $teacherSession->getAvatarColor();
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
             <a class="navbar-brand" href="#">
-                <i class="fas fa-chalkboard-teacher me-2"></i> Teacher Dashboard
+                <img src="../assets/img/URUScript.png" alt="JS Tutorial Logo" width="40" height="40"> Teacher Dashboard
             </a>
             <div class="navbar-nav ms-auto">
                 <div class="dropdown">

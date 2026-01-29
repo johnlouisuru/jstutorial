@@ -402,7 +402,7 @@ function exportLessons($conn, $data) {
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
             <a class="navbar-brand" href="#">
-                <i class="fas fa-chalkboard-teacher me-2"></i> Lessons
+                <img src="../assets/img/URUScript.png" alt="JS Tutorial Logo" width="40" height="40"> Lessons
             </a>
             <div class="navbar-nav ms-auto">
                 <div class="dropdown">
