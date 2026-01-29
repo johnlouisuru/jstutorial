@@ -209,6 +209,37 @@ function reorderTopics($conn, $order) {
             background: #f8d7da;
             color: #721c24;
         }
+        /* Mobile responsiveness fixes */
+@media (max-width: 768px) {
+    .topic-item .d-flex.justify-content-between {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .topic-item .d-flex.align-items-center {
+        width: 100%;
+    }
+    
+    .topic-item .d-flex.gap-2 {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    
+    .topic-item .d-flex.gap-3 {
+        flex-wrap: wrap;
+        gap: 10px !important;
+    }
+    
+    .topic-item .text-muted {
+        margin-top: 5px;
+        width: 100%;
+        display: block;
+    }
+    
+    .status-badge {
+        margin-right: auto;
+    }
+}
     </style>
 </head>
 <body>
@@ -254,19 +285,19 @@ function reorderTopics($conn, $order) {
     <div class="container-fluid py-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
-                <h2><i class="fas fa-folder me-2 text-primary"></i>Manage Topics</h2>
-                <p class="text-muted">Organize your tutorial topics</p>
+                <h2><i class="fas fa-folder me-2 text-primary"></i>Topics</h2>
+                <p class="text-muted">Organize Topics</p>
             </div>
             
             
 
             <div class="d-flex gap-2 m-1">
 
-                <a class="btn btn-info me-2" href="manage_lessons">
-                <i class="fas fa-plus me-1"></i> Add Lesson to Topic
+                <a class="btn btn-info me-2 btn-sm" href="manage_lessons">
+                <i class="fas fa-plus me-1"></i> Lesson
             </a>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTopicModal">
-                <i class="fas fa-plus me-1"></i> Add Topic
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addTopicModal">
+                <i class="fas fa-plus me-1"></i> Topic
             </button>
                 
             </div>
@@ -313,44 +344,44 @@ function reorderTopics($conn, $order) {
                             <?php if (count($topics) > 0): ?>
                                 <?php foreach($topics as $topic): ?>
                                 <div class="topic-item" data-id="<?php echo $topic['id']; ?>">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div class="d-flex align-items-center">
-                                            <div class="me-3 text-primary">
-                                                <i class="fas fa-grip-vertical"></i>
-                                            </div>
-                                            <div>
-                                                <h6 class="mb-1"><?php echo htmlspecialchars($topic['topic_name']); ?></h6>
-                                                <div class="d-flex gap-3 align-items-center">
-                                                    <span class="badge bg-secondary">Order: <?php echo $topic['topic_order']; ?></span>
-                                                    <span class="lesson-count">
-                                                        <i class="fas fa-book me-1"></i>
-                                                        <?php echo $topic['lesson_count']; ?> lessons
-                                                    </span>
-                                                    <span class="lesson-count">
-                                                        <i class="fas fa-check me-1"></i>
-                                                        <?php echo $topic['active_lessons']; ?> active
-                                                    </span>
-                                                    <?php if ($topic['description']): ?>
-                                                    <small class="text-muted"><?php echo htmlspecialchars($topic['description']); ?></small>
-                                                    <?php endif; ?>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="d-flex gap-2">
-                                            <span class="status-badge <?php echo $topic['is_active'] ? 'active' : 'inactive'; ?>">
-                                                <?php echo $topic['is_active'] ? 'Active' : 'Inactive'; ?>
-                                            </span>
-                                            <button class="btn btn-sm btn-outline-primary" 
-                                                    onclick="editTopic(<?php echo $topic['id']; ?>)">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-danger" 
-                                                    onclick="deleteTopic(<?php echo $topic['id']; ?>)">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
+    <div class="row align-items-center">
+        <div class="col-1 text-primary d-none d-md-block">
+            <i class="fas fa-grip-vertical"></i>
+        </div>
+        <div class="col-md-8 col-12">
+            <h6 class="mb-1"><?php echo htmlspecialchars($topic['topic_name']); ?></h6>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <span class="badge bg-secondary">Order: <?php echo $topic['topic_order']; ?></span>
+                <span class="lesson-count">
+                    <i class="fas fa-book me-1"></i>
+                    <?php echo $topic['lesson_count']; ?> lessons
+                </span>
+                <span class="lesson-count">
+                    <i class="fas fa-check me-1"></i>
+                    <?php echo $topic['active_lessons']; ?> active
+                </span>
+                <?php if ($topic['description']): ?>
+                <small class="text-muted w-100 mt-1"><?php echo htmlspecialchars($topic['description']); ?></small>
+                <?php endif; ?>
+            </div>
+        </div>
+        <div class="col-md-3 col-12 text-end">
+            <div class="d-flex flex-wrap gap-2 align-items-center justify-content-end mt-2 mt-md-0">
+                <span class="status-badge <?php echo $topic['is_active'] ? 'active' : 'inactive'; ?> me-auto me-md-0">
+                    <?php echo $topic['is_active'] ? 'Active' : 'Inactive'; ?>
+                </span>
+                <button class="btn btn-sm btn-outline-primary" 
+                        onclick="editTopic(<?php echo $topic['id']; ?>)">
+                    <i class="fas fa-edit"></i> <span class="d-none d-sm-inline">Edit</span>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" 
+                        onclick="deleteTopic(<?php echo $topic['id']; ?>)">
+                    <i class="fas fa-trash"></i> <span class="d-none d-sm-inline">Delete</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <div class="text-center py-5">

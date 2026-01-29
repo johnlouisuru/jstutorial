@@ -192,34 +192,127 @@ $username = $studentSession->getStudentData()['username'];
         .output-info { color: #63b3ed; }
         
         /* Mobile Responsive */
-        @media (max-width: 992px) {
-            .sidebar {
-                position: fixed;
-                left: 0;
-                top: 56px;
-                bottom: 0;
-                transform: translateX(-100%);
-                z-index: 1000;
-                width: 100%;
-                max-width: 320px;
-            }
-            
-            .sidebar.open {
-                transform: translateX(0);
-            }
-            
-            .sidebar-toggle {
-                display: flex !important;
-            }
-            
-            .editor-container {
-                height: 50px;
-            }
-            
-            .output-panel {
-                height: 150px;
-            }
+@media (max-width: 992px) {
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 56px;
+        bottom: 0;
+        transform: translateX(-100%);
+        z-index: 1000;
+        width: 100%;
+        max-width: 320px;
+    }
+    
+    .sidebar.open {
+        transform: translateX(0);
+    }
+    
+    .sidebar-toggle {
+        display: flex !important;
+    }
+    
+    /* Fix editor container for mobile */
+    .editor-container {
+        height: 40vh !important;
+        min-height: 250px;
+        max-height: 350px;
+    }
+    
+    .output-panel {
+        height: 25vh;
+        min-height: 150px;
+    }
+    
+    /* Fix toolbar for mobile */
+    .toolbar {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px;
+    }
+    
+    .toolbar > .d-flex.align-items-center {
+        order: 1;
+        width: 100%;
+        margin-bottom: 8px;
+    }
+    
+    .toolbar > .d-flex.gap-2 {
+        order: 2;
+        width: 100%;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    
+    .toolbar .btn {
+        font-size: 12px;
+        padding: 4px 8px;
+        flex: 1;
+        min-width: 80px;
+        justify-content: center;
+    }
+    
+    .toolbar .btn-sm {
+        min-height: 32px;
+    }
+    
+    .toolbar .input-group {
+        width: 100% !important;
+        max-width: 250px;
+        margin: 0 auto;
+    }
+    
+    /* Adjust main content padding */
+    .content-area {
+        padding: 10px !important;
+    }
+    
+    /* Hide text in buttons on very small screens */
+    @media (max-width: 480px) {
+        .toolbar .btn span:not(.fa) {
+            display: none;
         }
+        
+        .toolbar .btn {
+            min-width: 40px;
+            max-width: 60px;
+        }
+        
+        .toolbar .btn i {
+            margin-right: 0 !important;
+        }
+        
+        .input-group-text, .input-group input {
+            font-size: 12px;
+        }
+        
+        .d-flex.justify-content-between {
+            flex-direction: column;
+            align-items: flex-start !important;
+        }
+        
+        #statusBadge, #executionTime {
+            margin-top: 5px;
+        }
+    }
+    
+    /* For medium mobile screens */
+    @media (max-width: 576px) {
+        .toolbar .btn span:not(.fa) {
+            font-size: 11px;
+        }
+        
+        .toolbar .btn {
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        
+        .text-white.me-3 {
+            font-size: 14px;
+        }
+    }
+}
         
         .sidebar-toggle {
             display: none;
@@ -275,6 +368,88 @@ $username = $studentSession->getStudentData()['username'];
             padding: 10px;
             margin-top: 10px;
         }
+
+        /* Additional mobile optimizations */
+@media (max-width: 768px) {
+    /* Adjust navbar for mobile */
+    .navbar .d-flex.align-items-center {
+        flex-direction: column;
+        align-items: flex-end !important;
+        gap: 5px;
+    }
+    
+    /* Better button grouping */
+    .toolbar .d-flex.gap-2 {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 5px;
+    }
+    
+    /* Make save/format buttons smaller */
+    .toolbar .btn-outline-light {
+        font-size: 11px;
+    }
+    
+    /* Run button should be prominent */
+    .toolbar .btn-success {
+        grid-column: span 1;
+        font-weight: bold;
+    }
+    
+    /* Status area adjustments */
+    #statusText {
+        font-size: 12px;
+        display: block;
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    
+    /* File input adjustments */
+    .input-group-sm {
+        font-size: 12px;
+    }
+    
+    /* Reduce padding */
+    .content-area.p-3 {
+        padding: 8px !important;
+    }
+}
+
+/* Extra small devices */
+@media (max-width: 400px) {
+    .toolbar .d-flex.gap-2 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .navbar-brand {
+        font-size: 16px;
+    }
+    
+    .sidebar-content {
+        padding: 15px 10px;
+    }
+    
+    .sidebar-item {
+        padding: 8px 10px;
+        font-size: 14px;
+    }
+}
+
+/* Monaco editor mobile fixes */
+.monaco-editor {
+    min-height: 200px !important;
+}
+
+/* Output panel mobile adjustments */
+.output-content {
+    font-size: 12px !important;
+    padding: 8px !important;
+}
+
+.output-header {
+    padding: 6px 10px !important;
+    font-size: 14px;
+}
     </style>
 </head>
 <body>
@@ -282,7 +457,8 @@ $username = $studentSession->getStudentData()['username'];
     <nav class="navbar navbar-dark">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">
-                <i class="fab fa-js-square me-2"></i>URUScript Practice Area
+                <!-- <i class="fab fa-js-square me-2"></i>URUScript Practice Area -->
+                <img src="assets/img/URUScript.png" alt="URUScript Logo" width="40" height="40" class="me-2">URUScript Practice Area
             </a>
             <button class="sidebar-toggle" id="sidebarToggle">
                 <i class="fas fa-bars"></i>
@@ -358,36 +534,46 @@ $username = $studentSession->getStudentData()['username'];
         <!-- Main Content -->
         <div class="content-area p-3">
             <!-- Toolbar -->
-            <div class="toolbar rounded-top">
-                <div class="d-flex align-items-center gap-3">
-                    <span class="text-white">
-                        <i class="fab fa-js me-2"></i>URUScript Editor
-                    </span>
-                    
-                    <div class="input-group input-group-sm" style="width: 200px;">
-                        <span class="input-group-text bg-dark text-white border-dark">
-                            <i class="fas fa-file-code"></i>
-                        </span>
-                        <input type="text" id="fileName" class="form-control bg-dark text-white border-dark" 
-                               placeholder="filename.js" value="practice.js">
-                    </div>
-                </div>
-                
-                <div class="d-flex gap-2 ms-auto">
-                    <button class="btn btn-sm btn-outline-light" onclick="saveFile()" title="Save (Ctrl+S)">
-                        <i class="fas fa-save me-1"></i> Save
-                    </button>
-                    <button class="btn btn-sm btn-outline-light" onclick="formatCode()" title="Format Code">
-                        <i class="fas fa-magic me-1"></i> Format
-                    </button>
-                    <button class="btn btn-sm btn-success" onclick="runCode()" title="Run (Ctrl+Enter)">
-                        <i class="fas fa-play me-1"></i> Run Code
-                    </button>
-                    <button class="btn btn-sm btn-outline-light" onclick="clearOutput()" title="Clear Output">
-                        <i class="fas fa-broom me-1"></i> Clear
-                    </button>
-                </div>
-            </div>
+<div class="toolbar rounded-top">
+    <!-- Mobile first row -->
+    <div class="d-flex align-items-center w-100 mb-2 mb-md-0">
+        <span class="text-white d-none d-md-inline">
+            <i class="fab fa-js me-2"></i>URUScript Editor
+        </span>
+        
+        <div class="input-group input-group-sm ms-auto" style="max-width: 250px;">
+            <span class="input-group-text bg-dark text-white border-dark">
+                <i class="fas fa-file-code"></i>
+            </span>
+            <input type="text" id="fileName" class="form-control bg-dark text-white border-dark" 
+                   placeholder="filename.js" value="practice.js">
+        </div>
+    </div>
+    
+    <!-- Button group - responsive -->
+    <div class="d-flex gap-2 w-100 flex-wrap justify-content-center justify-content-md-end">
+        <button class="btn btn-sm btn-outline-light flex-grow-1 flex-md-grow-0" 
+                onclick="saveFile()" title="Save (Ctrl+S)">
+            <i class="fas fa-save me-1"></i> 
+            <span class="d-none d-sm-inline">Save</span>
+        </button>
+        <button class="btn btn-sm btn-outline-light flex-grow-1 flex-md-grow-0" 
+                onclick="formatCode()" title="Format Code">
+            <i class="fas fa-magic me-1"></i> 
+            <span class="d-none d-sm-inline">Format</span>
+        </button>
+        <button class="btn btn-sm btn-success flex-grow-1 flex-md-grow-0" 
+                onclick="runCode()" title="Run (Ctrl+Enter)">
+            <i class="fas fa-play me-1"></i> 
+            <span class="d-none d-sm-inline">Run</span>
+        </button>
+        <button class="btn btn-sm btn-outline-light flex-grow-1 flex-md-grow-0" 
+                onclick="clearOutput()" title="Clear Output">
+            <i class="fas fa-broom me-1"></i> 
+            <span class="d-none d-sm-inline">Clear</span>
+        </button>
+    </div>
+</div>
             
             <!-- Status -->
             <div class="d-flex align-items-center justify-content-between my-2">
@@ -967,6 +1153,50 @@ window.jsExamples = {
             document.getElementById('sidebar').classList.remove('open');
         }
     });
+
+    // Mobile-specific adjustments
+function handleMobileLayout() {
+    if (window.innerWidth < 768) {
+        // Adjust editor height for mobile
+        const editorContainer = document.querySelector('.editor-container');
+        if (editorContainer) {
+            const windowHeight = window.innerHeight;
+            const navHeight = 56; // navbar height
+            const toolbarHeight = document.querySelector('.toolbar').offsetHeight;
+            const statusHeight = document.querySelector('#statusText').parentElement.offsetHeight;
+            const outputHeight = 150; // fixed output height for mobile
+            
+            // Calculate available height for editor
+            const availableHeight = windowHeight - navHeight - toolbarHeight - statusHeight - outputHeight - 50;
+            const editorHeight = Math.max(200, Math.min(availableHeight, 350));
+            
+            editorContainer.style.height = editorHeight + 'px';
+            
+            // Force Monaco editor to resize if it exists
+            if (editor && editor.layout) {
+                setTimeout(() => editor.layout(), 100);
+            }
+        }
+        
+        // Update button text for very small screens
+        const buttons = document.querySelectorAll('.toolbar .btn');
+        buttons.forEach(btn => {
+            if (window.innerWidth < 480) {
+                // Hide text, show only icons
+                const spans = btn.querySelectorAll('span:not(.fa)');
+                spans.forEach(span => span.style.display = 'none');
+            } else {
+                // Show abbreviated text
+                const spans = btn.querySelectorAll('span:not(.fa)');
+                spans.forEach(span => span.style.display = 'inline');
+            }
+        });
+    }
+}
+
+// Call on load and resize
+window.addEventListener('load', handleMobileLayout);
+window.addEventListener('resize', handleMobileLayout);
 
     // Initialize
     function init() {

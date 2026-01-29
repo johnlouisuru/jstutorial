@@ -324,6 +324,96 @@ $studentData = $studentSession->getStudentData();
             }
         }
 
+        /* Mobile Responsiveness for Navigation Buttons */
+@media (max-width: 768px) {
+    /* Navigation buttons - stack vertically on mobile */
+    .lesson-content .d-flex.justify-content-between {
+        flex-direction: column !important;
+        gap: 15px !important;
+        align-items: stretch !important;
+    }
+    
+    .lesson-content .d-flex.justify-content-between > * {
+        width: 100% !important;
+        text-align: center !important;
+        margin: 5px 0 !important;
+    }
+    
+    .lesson-content .d-flex.justify-content-between .btn {
+        width: 100% !important;
+        margin: 5px 0 !important;
+        justify-content: center !important;
+    }
+    
+    /* Adjust button sizes for mobile */
+    .lesson-content .btn {
+        padding: 12px 20px !important;
+        font-size: 16px !important;
+        border-radius: 8px !important;
+        margin: 8px 0 !important;
+    }
+    
+    /* Make completed lesson text more visible */
+    .lesson-content h5.text.text-success {
+        text-align: center !important;
+        margin: 15px 0 !important;
+        font-size: 18px !important;
+        padding: 10px !important;
+        background: rgba(40, 167, 69, 0.1) !important;
+        border-radius: 8px !important;
+        width: 100% !important;
+    }
+    
+    /* Fix breadcrumb for mobile */
+    .breadcrumb {
+        font-size: 14px !important;
+        overflow-x: auto !important;
+        white-space: nowrap !important;
+        flex-wrap: nowrap !important;
+        padding-bottom: 5px !important;
+    }
+    
+    /* Adjust lesson header */
+    .lesson-content h1.display-6 {
+        font-size: 24px !important;
+    }
+}
+
+/* Extra small devices */
+@media (max-width: 576px) {
+    /* Even smaller buttons */
+    .lesson-content .btn {
+        padding: 10px 16px !important;
+        font-size: 15px !important;
+    }
+    
+    /* Stack buttons with icons only */
+    .lesson-content .btn i {
+        margin-right: 8px !important;
+        font-size: 18px !important;
+    }
+    
+    /* Hide button text on very small screens, show icons only */
+    .lesson-content .btn span:not(.fas):not(.fa) {
+        display: inline-block !important;
+    }
+    
+    /* Adjust the completed lesson badge */
+    .lesson-status-badge {
+        position: relative !important;
+        top: 0 !important;
+        right: 0 !important;
+        margin-bottom: 10px !important;
+        display: flex !important;
+        justify-content: center !important;
+    }
+    
+    .lesson-status-badge .badge {
+        font-size: 14px !important;
+        padding: 8px 12px !important;
+    }
+}
+
         /* Code Runner improvements */
 .CodeMirror {
     border-radius: 0.25rem;
