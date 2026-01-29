@@ -37,7 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teacher Login - JS Tutorial System</title>
+    
+    <title>Teacher Login - URUScript</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -72,7 +73,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="container">
         <div class="login-container">
             <div class="login-header">
-                <i class="fas fa-chalkboard-teacher"></i>
+                <!-- <i class="fas fa-chalkboard-teacher"></i> -->
+                <img src="../assets/img/URUScript.png" alt="JS Tutorial Logo" width="40" height="40">
                 <h2>Teacher Login</h2>
                 <p class="text-muted">Access your tutorial management dashboard</p>
             </div>
