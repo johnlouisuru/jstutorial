@@ -169,18 +169,37 @@ class StudentSession {
     }
     
     public function getStudentData() {
-        if ($this->isLoggedIn()) {
+    if ($this->isLoggedIn()) {
+        // Double-check we have the latest score
+        if (isset($_SESSION['student_score'])) {
             return [
                 'id' => $_SESSION['student_id'] ?? null,
                 'username' => $_SESSION['student_username'] ?? '',
                 'name' => $_SESSION['student_name'] ?? '',
                 'email' => $_SESSION['student_email'] ?? '',
                 'avatar' => $_SESSION['student_avatar'] ?? '#007bff',
-                'score' => $_SESSION['student_score'] ?? 0
+                'score' => $_SESSION['student_score'] // This should be updated already
+            ];
+        } else {
+            // Fallback: get from database
+            $score_query = "SELECT total_score FROM students WHERE id = ?";
+            $score_stmt = $this->conn->prepare($score_query);
+            $score_stmt->execute([$_SESSION['student_id']]);
+            $score_result = $score_stmt->fetch(PDO::FETCH_ASSOC);
+            $_SESSION['student_score'] = $score_result['total_score'] ?? 0;
+            
+            return [
+                'id' => $_SESSION['student_id'] ?? null,
+                'username' => $_SESSION['student_username'] ?? '',
+                'name' => $_SESSION['student_name'] ?? '',
+                'email' => $_SESSION['student_email'] ?? '',
+                'avatar' => $_SESSION['student_avatar'] ?? '#007bff',
+                'score' => $_SESSION['student_score']
             ];
         }
-        return null;
     }
+    return null;
+}
     
     public function updateStudentScore($points) {
         if (!$this->isLoggedIn()) return false;

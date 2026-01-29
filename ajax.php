@@ -85,4 +85,24 @@ if (isset($_GET['action'])) {
     echo json_encode($response);
     exit;
 }
+
+// Add this to your ajax.php
+if (isset($_GET['action']) && $_GET['action'] == 'refresh_score') {
+    if (!$studentSession->isLoggedIn()) {
+        echo json_encode(['success' => false]);
+        exit;
+    }
+    
+    // Get fresh score from database
+    $score_query = "SELECT total_score FROM students WHERE id = ?";
+    $score_stmt = $conn->prepare($score_query);
+    $score_stmt->execute([$studentSession->getStudentId()]);
+    $score_result = $score_stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Update session
+    $_SESSION['student_score'] = $score_result['total_score'] ?? 0;
+    
+    echo json_encode(['success' => true, 'score' => $_SESSION['student_score']]);
+    exit;
+}
 ?>

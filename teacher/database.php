@@ -56,40 +56,47 @@ class StudentSession {
     }
     
     public function login($username, $password) {
-        try {
-            $query = "SELECT id, username, email, full_name, avatar_color, total_score 
-                      FROM students 
-                      WHERE username = :username 
-                      AND password = SHA2(:password, 256) 
-                      AND deleted_at IS NULL";
+    try {
+        $query = "SELECT id, username, email, full_name, avatar_color, total_score 
+                  FROM students 
+                  WHERE username = :username 
+                  AND password = SHA2(:password, 256) 
+                  AND deleted_at IS NULL";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':username', $username);
+        $stmt->bindParam(':password', $password);
+        $stmt->execute();
+        
+        if ($stmt->rowCount() > 0) {
+            $student = $stmt->fetch(PDO::FETCH_ASSOC);
             
-            $stmt = $this->conn->prepare($query);
-            $stmt->bindParam(':username', $username);
-            $stmt->bindParam(':password', $password);
-            $stmt->execute();
+            // IMPORTANT: Get fresh score from database
+            $score_query = "SELECT total_score FROM students WHERE id = ?";
+            $score_stmt = $this->conn->prepare($score_query);
+            $score_stmt->execute([$student['id']]);
+            $score_result = $score_stmt->fetch(PDO::FETCH_ASSOC);
+            $actual_score = $score_result['total_score'] ?? 0;
             
-            if ($stmt->rowCount() > 0) {
-                $student = $stmt->fetch(PDO::FETCH_ASSOC);
-                
-                // Set session variables
-                $_SESSION['student_id'] = $student['id'];
-                $_SESSION['student_username'] = $student['username'];
-                $_SESSION['student_name'] = $student['full_name'] ?? $student['username'];
-                $_SESSION['student_email'] = $student['email'];
-                $_SESSION['student_avatar'] = $student['avatar_color'] ?? '#007bff';
-                $_SESSION['student_score'] = $student['total_score'];
-                
-                // Update last active timestamp
-                $this->updateLastActive($student['id']);
-                
-                return ['success' => true, 'student' => $student];
-            } else {
-                return ['success' => false, 'message' => 'Invalid credentials'];
-            }
-        } catch(PDOException $e) {
-            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+            // Set session variables with actual database score
+            $_SESSION['student_id'] = $student['id'];
+            $_SESSION['student_username'] = $student['username'];
+            $_SESSION['student_name'] = $student['full_name'] ?? $student['username'];
+            $_SESSION['student_email'] = $student['email'];
+            $_SESSION['student_avatar'] = $student['avatar_color'] ?? '#007bff';
+            $_SESSION['student_score'] = $actual_score; // Use actual database value
+            
+            // Update last active timestamp
+            $this->updateLastActive($student['id']);
+            
+            return ['success' => true, 'student' => $student];
+        } else {
+            return ['success' => false, 'message' => 'Invalid credentials'];
         }
+    } catch(PDOException $e) {
+        return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
     }
+}
     
     public function register($full_name, $username, $email, $password) {
         try {
@@ -182,23 +189,34 @@ class StudentSession {
     }
     
     public function updateStudentScore($points) {
-        if (!$this->isLoggedIn()) return false;
+    if (!$this->isLoggedIn()) return false;
+    
+    try {
+        // First update database
+        $query = "UPDATE students SET total_score = total_score + :points WHERE id = :student_id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':points', $points, PDO::PARAM_INT);
+        $stmt->bindParam(':student_id', $_SESSION['student_id'], PDO::PARAM_INT);
+        $success = $stmt->execute();
         
-        try {
-            // Update session score
-            $_SESSION['student_score'] += $points;
+        if ($success) {
+            // Then get the fresh value from database
+            $score_query = "SELECT total_score FROM students WHERE id = ?";
+            $score_stmt = $this->conn->prepare($score_query);
+            $score_stmt->execute([$_SESSION['student_id']]);
+            $score_result = $score_stmt->fetch(PDO::FETCH_ASSOC);
             
-            // Update database
-            $query = "UPDATE students SET total_score = total_score + :points WHERE id = :student_id";
-            $stmt = $this->conn->prepare($query);
-            $stmt->bindParam(':points', $points, PDO::PARAM_INT);
-            $stmt->bindParam(':student_id', $_SESSION['student_id'], PDO::PARAM_INT);
+            // Update session with actual database value
+            $_SESSION['student_score'] = $score_result['total_score'] ?? 0;
             
-            return $stmt->execute();
-        } catch(PDOException $e) {
-            return false;
+            return true;
         }
+        return false;
+    } catch(PDOException $e) {
+        error_log("Error updating student score: " . $e->getMessage());
+        return false;
     }
+}
     
     private function updateLastActive($student_id) {
         try {

@@ -157,92 +157,224 @@ function resetStudentPassword($conn, $student_id) {
 
 function getStudentProgress($conn, $student_id) {
     try {
+        // Get student basic info first
+        $student_query = "SELECT username, email, full_name, avatar_color, created_at, total_score 
+                         FROM students WHERE id = ? AND deleted_at IS NULL";
+        $student_stmt = $conn->prepare($student_query);
+        $student_stmt->execute([$student_id]);
+        $student = $student_stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$student) {
+            return ['success' => false, 'message' => 'Student not found'];
+        }
+        
+        // Enhanced query to get detailed progress with proper aggregation
         $query = "SELECT 
+            t.id as topic_id,
             t.topic_name,
+            t.topic_order,
+            l.id as lesson_id,
             l.lesson_title,
             l.lesson_order,
-            sp.is_completed as completed,
+            l.content_type,
+            sp.is_completed,
             sp.completed_at,
             sp.last_accessed,
             q.id as quiz_id,
             q.question,
+            q.difficulty,
+            sqa.selected_option_id,
             sqa.is_correct as quiz_correct,
             sqa.time_spent as quiz_time_spent,
-            sqa.attempted_at as quiz_attempted_at
-        FROM student_progress sp
-        JOIN lessons l ON sp.lesson_id = l.id AND l.deleted_at IS NULL
-        JOIN topics t ON l.topic_id = t.id AND t.deleted_at IS NULL
+            sqa.attempted_at as quiz_attempted_at,
+            qo.option_text as selected_answer,
+            (SELECT COUNT(*) FROM quizzes q2 WHERE q2.lesson_id = l.id AND q2.deleted_at IS NULL) as total_quizzes
+        FROM topics t
+        LEFT JOIN lessons l ON l.topic_id = t.id AND l.deleted_at IS NULL AND l.is_active = 1
+        LEFT JOIN student_progress sp ON sp.lesson_id = l.id AND sp.student_id = ?
         LEFT JOIN quizzes q ON q.lesson_id = l.id AND q.deleted_at IS NULL
-        LEFT JOIN student_quiz_attempts sqa ON sqa.quiz_id = q.id AND sqa.student_id = sp.student_id
-        WHERE sp.student_id = ?
-        ORDER BY t.topic_order, l.lesson_order";
+        LEFT JOIN student_quiz_attempts sqa ON sqa.quiz_id = q.id AND sqa.student_id = ?
+        LEFT JOIN quiz_options qo ON qo.id = sqa.selected_option_id
+        WHERE t.deleted_at IS NULL AND t.is_active = 1
+        ORDER BY t.topic_order, l.lesson_order, q.id";
         
         $stmt = $conn->prepare($query);
-        $stmt->execute([$student_id]);
+        $stmt->execute([$student_id, $student_id]);
         $progress = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Calculate totals
-        $total_lessons = 0;
-        $completed_lessons = 0;
-        $quiz_correct = 0;
-        $quiz_total = 0;
-        $total_time = 0;
+        // Get total lessons count
+        $total_lessons_query = "SELECT COUNT(*) as total FROM lessons 
+                               WHERE deleted_at IS NULL AND is_active = 1";
+        $total_lessons_result = $conn->query($total_lessons_query);
+        $total_system_lessons = $total_lessons_result->fetch(PDO::FETCH_ASSOC)['total'];
+        
+        // Organize data by topics
         $topics = [];
+        $completed_lessons = 0;
+        $attempted_quizzes = 0;
+        $correct_quizzes = 0;
+        $total_time = 0;
+        $lesson_stats = [];
         
         foreach ($progress as $item) {
-            if (!isset($topics[$item['topic_name']])) {
-                $topics[$item['topic_name']] = [
-                    'total' => 0,
-                    'completed' => 0,
-                    'quizzes' => 0,
+            $topic_id = $item['topic_id'];
+            
+            if (!isset($topics[$topic_id])) {
+                $topics[$topic_id] = [
+                    'topic_name' => $item['topic_name'],
+                    'topic_order' => $item['topic_order'],
+                    'lessons' => [],
+                    'total_lessons' => 0,
+                    'completed_lessons' => 0,
+                    'total_quizzes' => 0,
+                    'attempted_quizzes' => 0,
                     'correct_quizzes' => 0
                 ];
             }
             
-            // Count each lesson only once (deduplicate by lesson_id)
-            static $processed_lessons = [];
-            if (!in_array($item['lesson_title'], $processed_lessons)) {
-                $topics[$item['topic_name']]['total']++;
-                $total_lessons++;
-                $processed_lessons[] = $item['lesson_title'];
+            // Process lesson (only if lesson exists)
+            if ($item['lesson_id']) {
+                $lesson_id = $item['lesson_id'];
                 
-                if ($item['completed']) {
-                    $topics[$item['topic_name']]['completed']++;
-                    $completed_lessons++;
+                if (!isset($topics[$topic_id]['lessons'][$lesson_id])) {
+                    $topics[$topic_id]['lessons'][$lesson_id] = [
+                        'lesson_id' => $item['lesson_id'],
+                        'lesson_title' => $item['lesson_title'],
+                        'lesson_order' => $item['lesson_order'],
+                        'content_type' => $item['content_type'],
+                        'is_completed' => $item['is_completed'],
+                        'completed_at' => $item['completed_at'],
+                        'last_accessed' => $item['last_accessed'],
+                        'quizzes' => [],
+                        'total_quizzes' => $item['total_quizzes'] ?: 0,
+                        'attempted_quizzes' => 0,
+                        'correct_quizzes' => 0
+                    ];
+                    
+                    $topics[$topic_id]['total_lessons']++;
+                    
+                    if ($item['is_completed']) {
+                        $topics[$topic_id]['completed_lessons']++;
+                        $completed_lessons++;
+                    }
                 }
-            }
-            
-            // Count quizzes
-            if ($item['quiz_id'] && $item['quiz_correct'] !== null) {
-                $topics[$item['topic_name']]['quizzes']++;
-                $quiz_total++;
                 
-                if ($item['quiz_correct']) {
-                    $topics[$item['topic_name']]['correct_quizzes']++;
-                    $quiz_correct++;
-                }
-                
-                if ($item['quiz_time_spent']) {
-                    $total_time += $item['quiz_time_spent'];
+                // Process quiz attempt
+                if ($item['quiz_id']) {
+                    if (!isset($topics[$topic_id]['lessons'][$lesson_id]['quizzes'][$item['quiz_id']])) {
+                        $topics[$topic_id]['lessons'][$lesson_id]['quizzes'][$item['quiz_id']] = [
+                            'quiz_id' => $item['quiz_id'],
+                            'question' => $item['question'],
+                            'difficulty' => $item['difficulty'],
+                            'attempts' => []
+                        ];
+                        $topics[$topic_id]['total_quizzes']++;
+                    }
+                    
+                    if ($item['selected_option_id']) {
+                        $attempt = [
+                            'selected_option_id' => $item['selected_option_id'],
+                            'selected_answer' => $item['selected_answer'],
+                            'is_correct' => (bool)$item['quiz_correct'],
+                            'time_spent' => $item['quiz_time_spent'],
+                            'attempted_at' => $item['quiz_attempted_at']
+                        ];
+                        
+                        $topics[$topic_id]['lessons'][$lesson_id]['quizzes'][$item['quiz_id']]['attempts'][] = $attempt;
+                        $topics[$topic_id]['lessons'][$lesson_id]['attempted_quizzes']++;
+                        $topics[$topic_id]['attempted_quizzes']++;
+                        $attempted_quizzes++;
+                        
+                        if ($item['quiz_correct']) {
+                            $topics[$topic_id]['lessons'][$lesson_id]['correct_quizzes']++;
+                            $topics[$topic_id]['correct_quizzes']++;
+                            $correct_quizzes++;
+                        }
+                        
+                        if ($item['quiz_time_spent']) {
+                            $total_time += $item['quiz_time_spent'];
+                        }
+                    }
                 }
             }
         }
         
-        // Clear static variable for next call
-        unset($processed_lessons);
+        // Calculate topic completion rates
+        $topic_completion = [];
+        foreach ($topics as $topic_id => $topic) {
+            $completion_rate = $topic['total_lessons'] > 0 
+                ? round(($topic['completed_lessons'] / $topic['total_lessons']) * 100, 1) 
+                : 0;
+            
+            $quiz_success_rate = $topic['attempted_quizzes'] > 0
+                ? round(($topic['correct_quizzes'] / $topic['attempted_quizzes']) * 100, 1)
+                : 0;
+            
+            $topic_completion[$topic_id] = [
+                'topic_name' => $topic['topic_name'],
+                'completion_rate' => $completion_rate,
+                'completed_lessons' => $topic['completed_lessons'],
+                'total_lessons' => $topic['total_lessons'],
+                'quiz_success_rate' => $quiz_success_rate,
+                'correct_quizzes' => $topic['correct_quizzes'],
+                'attempted_quizzes' => $topic['attempted_quizzes'],
+                'total_quizzes' => $topic['total_quizzes']
+            ];
+        }
+        
+        // Calculate overall statistics
+        $completion_rate = $total_system_lessons > 0 
+            ? round(($completed_lessons / $total_system_lessons) * 100, 1) 
+            : 0;
+        
+        $quiz_success_rate = $attempted_quizzes > 0
+            ? round(($correct_quizzes / $attempted_quizzes) * 100, 1)
+            : 0;
+        
+        // Get last activity
+        $last_activity_query = "SELECT 
+            GREATEST(
+                COALESCE(MAX(sp.last_accessed), '2000-01-01'),
+                COALESCE(MAX(sqa.attempted_at), '2000-01-01'),
+                COALESCE(s.last_active, '2000-01-01')
+            ) as last_activity
+            FROM students s
+            LEFT JOIN student_progress sp ON sp.student_id = s.id
+            LEFT JOIN student_quiz_attempts sqa ON sqa.student_id = s.id
+            WHERE s.id = ?";
+        
+        $last_activity_stmt = $conn->prepare($last_activity_query);
+        $last_activity_stmt->execute([$student_id]);
+        $last_activity = $last_activity_stmt->fetch(PDO::FETCH_ASSOC)['last_activity'];
         
         return [
             'success' => true,
+            'student' => $student,
             'progress' => $progress,
+            'organized_topics' => $topics,
+            'topic_completion' => $topic_completion,
             'summary' => [
-                'total_lessons' => $total_lessons,
-                'completed_lessons' => $completed_lessons,
-                'completion_rate' => $total_lessons > 0 ? round(($completed_lessons / $total_lessons) * 100, 1) : 0,
-                'total_time_seconds' => $total_time,
-                'total_time_minutes' => round($total_time / 60, 1),
-                'quiz_score' => $quiz_total > 0 ? round(($quiz_correct / $quiz_total) * 100, 1) : 0,
-                'quiz_attempts' => $quiz_total,
-                'topics' => $topics
+                'student_info' => [
+                    'username' => $student['username'],
+                    'full_name' => $student['full_name'],
+                    'email' => $student['email'],
+                    'avatar_color' => $student['avatar_color'],
+                    'created_at' => $student['created_at'],
+                    'total_score' => $student['total_score'],
+                    'last_activity' => $last_activity
+                ],
+                'progress_overview' => [
+                    'completed_lessons' => $completed_lessons,
+                    'total_system_lessons' => $total_system_lessons,
+                    'completion_rate' => $completion_rate,
+                    'attempted_quizzes' => $attempted_quizzes,
+                    'correct_quizzes' => $correct_quizzes,
+                    'quiz_success_rate' => $quiz_success_rate,
+                    'total_time_seconds' => $total_time,
+                    'total_time_minutes' => round($total_time / 60, 1),
+                    'total_time_hours' => round($total_time / 3600, 2)
+                ],
+                'topic_summary' => $topic_completion
             ]
         ];
     } catch (PDOException $e) {
@@ -857,152 +989,265 @@ jane_smith,jane@example.com"></textarea>
         $('#statusFilter, #progressFilter').on('change', filterTable);
         
         // View student progress
-        function viewProgress(studentId) {
-            $('#progressContent').html(`
-                <div class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
+        // Update the viewProgress function to handle the new data structure
+function viewProgress(studentId) {
+    $('#progressContent').html(`
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    `);
+    
+    const modal = new bootstrap.Modal(document.getElementById('progressModal'));
+    modal.show();
+    
+    fetch('student_management.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `action=get_student_progress&student_id=${studentId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const student = data.student;
+            const summary = data.summary;
+            const topics = data.organized_topics;
+            const topicCompletion = data.topic_completion;
+            
+            let html = `
+                <!-- Student Header -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <div class="student-avatar" style="width: 60px; height: 60px; background: ${student.avatar_color};">
+                                    ${student.username.charAt(0).toUpperCase()}
+                                </div>
+                            </div>
+                            <div class="col">
+                                <h4 class="mb-1">${student.full_name || student.username}</h4>
+                                <p class="text-muted mb-1">${student.email}</p>
+                                <small class="text-muted">
+                                    Joined: ${new Date(student.created_at).toLocaleDateString()} | 
+                                    Last Active: ${new Date(summary.student_info.last_activity).toLocaleDateString()}
+                                </small>
+                            </div>
+                            <div class="col-auto">
+                                <span class="badge bg-primary fs-6">
+                                    <i class="fas fa-star me-1"></i>
+                                    ${student.total_score || 0} pts
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            `);
-            
-            const modal = new bootstrap.Modal(document.getElementById('progressModal'));
-            modal.show();
-            
-            fetch('student_management.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `action=get_student_progress&student_id=${studentId}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const progress = data.progress;
-                    const summary = data.summary;
-                    
-                    let html = `
-                        <div class="mb-4">
-                            <div class="row">
-                                <div class="col-md-3">
-                                    <div class="card bg-light">
-                                        <div class="card-body text-center">
-                                            <h3>${summary.completed_lessons}/${summary.total_lessons}</h3>
-                                            <small>Lessons Completed</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="card bg-light">
-                                        <div class="card-body text-center">
-                                            <h3>${summary.completion_rate}%</h3>
-                                            <small>Completion Rate</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="card bg-light">
-                                        <div class="card-body text-center">
-                                            <h3>${summary.total_time_minutes}</h3>
-                                            <small>Minutes Spent</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="card bg-light">
-                                        <div class="card-body text-center">
-                                            <h3>${summary.quiz_score}%</h3>
-                                            <small>Quiz Score</small>
-                                        </div>
-                                    </div>
+                
+                <!-- Progress Overview -->
+                <div class="row mb-4">
+                    <div class="col-md-3 mb-3">
+                        <div class="card bg-primary text-white">
+                            <div class="card-body text-center">
+                                <h2 class="mb-0">${summary.progress_overview.completion_rate}%</h2>
+                                <small>Overall Completion</small>
+                                <div class="progress mt-2 bg-white bg-opacity-25" style="height: 6px;">
+                                    <div class="progress-bar bg-white" style="width: ${summary.progress_overview.completion_rate}%"></div>
                                 </div>
                             </div>
                         </div>
-                        
-                        <h5>Topic Progress</h5>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card bg-success text-white">
+                            <div class="card-body text-center">
+                                <h2 class="mb-0">${summary.progress_overview.completed_lessons}/${summary.progress_overview.total_system_lessons}</h2>
+                                <small>Lessons Completed</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card bg-info text-white">
+                            <div class="card-body text-center">
+                                <h2 class="mb-0">${summary.progress_overview.quiz_success_rate}%</h2>
+                                <small>Quiz Success Rate</small>
+                                <div class="progress mt-2 bg-white bg-opacity-25" style="height: 6px;">
+                                    <div class="progress-bar bg-white" style="width: ${summary.progress_overview.quiz_success_rate}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card bg-warning text-white">
+                            <div class="card-body text-center">
+                                <h2 class="mb-0">${summary.progress_overview.total_time_minutes}</h2>
+                                <small>Minutes Spent</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Topic Progress Summary -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Topic Progress Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Topic</th>
+                                        <th>Progress</th>
+                                        <th>Lessons</th>
+                                        <th>Quizzes</th>
+                                        <th>Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+            `;
+            
+            // Add topic summary rows
+            Object.values(topicCompletion).forEach(topic => {
+                html += `
+                    <tr>
+                        <td><strong>${topic.topic_name}</strong></td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="progress flex-grow-1 me-2" style="height: 8px;">
+                                    <div class="progress-bar bg-success" style="width: ${topic.completion_rate}%"></div>
+                                </div>
+                                <small>${topic.completion_rate}%</small>
+                            </div>
+                        </td>
+                        <td>${topic.completed_lessons}/${topic.total_lessons}</td>
+                        <td>${topic.correct_quizzes}/${topic.attempted_quizzes}</td>
+                        <td>
+                            <span class="badge ${topic.quiz_success_rate >= 70 ? 'bg-success' : topic.quiz_success_rate >= 50 ? 'bg-warning' : 'bg-danger'}">
+                                ${topic.quiz_success_rate}%
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Detailed Topic Progress -->
+                <h5 class="mb-3">Detailed Lesson Progress</h5>
+            `;
+            
+            // Add detailed topic sections
+            Object.values(topics).forEach(topic => {
+                if (topic.lessons.length > 0) {
+                    const topicStats = topicCompletion[topic.topic_id] || {};
+                    const completionRate = topicStats.completion_rate || 0;
+                    
+                    html += `
+                        <div class="card mb-4">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>${topic.topic_name}</strong>
+                                    <span class="badge bg-primary ms-2">
+                                        ${topic.completed_lessons}/${topic.total_lessons} lessons
+                                    </span>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <div class="me-3">
+                                        <small class="text-muted">Quiz Score:</small>
+                                        <span class="badge ${topicStats.quiz_success_rate >= 70 ? 'bg-success' : topicStats.quiz_success_rate >= 50 ? 'bg-warning' : 'bg-danger'} ms-1">
+                                            ${topicStats.quiz_success_rate || 0}%
+                                        </span>
+                                    </div>
+                                    <div class="progress" style="width: 100px; height: 8px;">
+                                        <div class="progress-bar bg-success" style="width: ${completionRate}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
                     `;
                     
-                    // Group by topic
-                    const topics = {};
-                    progress.forEach(item => {
-                        if (!topics[item.topic_name]) {
-                            topics[item.topic_name] = [];
+                    Object.values(topic.lessons).forEach(lesson => {
+                        const lessonCompletion = lesson.is_completed ? 'Completed' : 'Not Started';
+                        const lessonBadge = lesson.is_completed ? 'bg-success' : 'bg-secondary';
+                        
+                        html += `
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>
+                                        <strong>${lesson.lesson_title}</strong>
+                                        <span class="badge ${lessonBadge} ms-2">${lessonCompletion}</span>
+                                        <span class="badge bg-info ms-1">${lesson.content_type}</span>
+                                    </div>
+                                    <small class="text-muted">
+                                        ${lesson.completed_at ? 'Completed: ' + new Date(lesson.completed_at).toLocaleDateString() : 'Not completed'}
+                                    </small>
+                                </div>
+                        `;
+                        
+                        if (lesson.quizzes && Object.keys(lesson.quizzes).length > 0) {
+                            html += `
+                                <div class="ms-3">
+                                    <small class="text-muted d-block mb-1">Quizzes:</small>
+                            `;
+                            
+                            Object.values(lesson.quizzes).forEach(quiz => {
+                                if (quiz.attempts && quiz.attempts.length > 0) {
+                                    quiz.attempts.forEach(attempt => {
+                                        const attemptBadge = attempt.is_correct ? 'bg-success' : 'bg-danger';
+                                        const attemptIcon = attempt.is_correct ? 'fa-check' : 'fa-times';
+                                        
+                                        html += `
+                                            <div class="d-flex align-items-center mb-1">
+                                                <i class="fas ${attemptIcon} me-2 text-muted"></i>
+                                                <small class="flex-grow-1">${quiz.question}</small>
+                                                <span class="badge ${attemptBadge} me-2">
+                                                    ${attempt.is_correct ? 'Correct' : 'Incorrect'}
+                                                </span>
+                                                <small class="text-muted">${attempt.time_spent}s</small>
+                                            </div>
+                                        `;
+                                    });
+                                } else {
+                                    html += `
+                                        <div class="text-muted small">
+                                            <i class="fas fa-minus me-2"></i>No attempts yet
+                                        </div>
+                                    `;
+                                }
+                            });
+                            
+                            html += `
+                                </div>
+                            `;
                         }
-                        topics[item.topic_name].push(item);
+                        
+                        html += `</div>`;
                     });
                     
-                    for (const [topicName, lessons] of Object.entries(topics)) {
-                        const completed = lessons.filter(l => l.completed).length;
-                        const total = lessons.length;
-                        const percentage = Math.round((completed / total) * 100);
-                        
-                        html += `
-                            <div class="card mb-3">
-                                <div class="card-header bg-light">
-                                    <strong>${topicName}</strong>
-                                    <span class="badge bg-primary float-end">${completed}/${total} lessons</span>
-                                </div>
-                                <div class="card-body">
-                                    <div class="progress mb-3" style="height: 10px;">
-                                        <div class="progress-bar bg-success" style="width: ${percentage}%"></div>
-                                    </div>
-                                    <div class="table-responsive">
-                                        <table class="table table-sm">
-                                            <thead>
-                                                <tr>
-                                                    <th>Lesson</th>
-                                                    <th>Status</th>
-                                                    <th>Last Accessed</th>
-                                                    <th>Quiz Result</th>
-                                                    <th>Quiz Time</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                        `;
-                        
-                        lessons.forEach(lesson => {
-                            html += `
-                                <tr>
-                                    <td>${lesson.lesson_title}</td>
-                                    <td>
-                                        ${lesson.completed 
-                                            ? '<span class="badge bg-success">Completed</span>' 
-                                            : '<span class="badge bg-secondary">Not Started</span>'}
-                                    </td>
-                                    <td>${lesson.last_accessed ? new Date(lesson.last_accessed).toLocaleDateString() : '-'}</td>
-                                    <td>
-                                        ${lesson.quiz_correct !== null 
-                                            ? (lesson.quiz_correct 
-                                                ? '<span class="badge bg-success">Correct</span>' 
-                                                : '<span class="badge bg-danger">Incorrect</span>')
-                                            : '-'}
-                                    </td>
-                                    <td>${lesson.quiz_time_spent ? Math.round(lesson.quiz_time_spent) + ' sec' : '-'}</td>
-                                </tr>
-                            `;
-                        });
-                        
-                        html += `
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
+                    html += `
                             </div>
-                        `;
-                    }
-                    
-                    $('#progressContent').html(html);
-                } else {
-                    $('#progressContent').html(`
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-circle me-2"></i>
-                            ${data.message}
                         </div>
-                    `);
+                    `;
                 }
             });
+            
+            $('#progressContent').html(html);
+        } else {
+            $('#progressContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    ${data.message}
+                </div>
+            `);
         }
+    });
+}
         
         // Edit student
         function editStudent(studentId) {

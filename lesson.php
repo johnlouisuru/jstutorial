@@ -1240,10 +1240,24 @@ function submitQuiz() {
             time_spent: timeSpent
         },
         dataType: 'json',
+        // In your submitQuiz() function AJAX success handler:
         success: function(response) {
             console.log('Quiz submission response:', response);
             
             if (response.success) {
+                // Update the score badge immediately
+                if (response.new_total_score !== undefined) {
+                    $('.score-badge').html(`<i class="fas fa-star me-1"></i> ${response.new_total_score} pts`);
+                    // Also update session in JavaScript for immediate display
+                    <?php if ($studentSession->isLoggedIn()): ?>
+                    // Force a small session update to keep in sync
+                    $.ajax({
+                        url: 'ajax.php?action=refresh_score',
+                        type: 'GET',
+                        async: false // Wait for this to complete
+                    });
+                    <?php endif; ?>
+                }
                 showQuizResult(isCorrect, response);
             } else {
                 showToast(response.message, 'danger');
