@@ -28,6 +28,14 @@ if (isset($_POST['action']) && $_POST['action'] == 'submit_quiz') {
     header('Content-Type: application/json');
     echo json_encode($response);
     exit;
+} 
+if(isset($_POST['action']) && $_POST['action'] == 'logout') {
+    $response = $studentSession->logout();
+    
+    // Send JSON response
+    header('Content-Type: application/json');
+    echo json_encode($response);
+    exit;
 }
 
 $topic_id = $_GET['topic_id'] ?? 1;
@@ -1563,7 +1571,7 @@ function showToast(message, type = 'info') {
 function logout() {
     if (confirm('Are you sure you want to logout?')) {
         $.ajax({
-            url: 'index.php',
+            url: 'lesson.php',
             type: 'POST',
             data: { action: 'logout' },
             dataType: 'json',
