@@ -269,7 +269,8 @@ $studentData = $studentSession->getStudentData();
                             AND sp.student_id = ? 
                             AND sp.is_completed = 1
                         WHERE l.topic_id = ? 
-                        AND l.is_active = 1";
+                        AND l.is_active = 1
+                        AND l.deleted_at IS NULL";
                     $progressStmt = $conn->prepare($progressQuery);
                     $progressStmt->execute([$studentSession->getStudentId(), $topic['id']]);
                     $progressData = $progressStmt->fetch(PDO::FETCH_ASSOC);
