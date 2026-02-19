@@ -340,21 +340,36 @@ function getStudentSegmentAnalysis($conn) {
         
         // Segment by performance
         $performance_query = "SELECT 
-            CASE 
-                WHEN s.total_score >= 80 THEN 'High Achievers'
-                WHEN s.total_score >= 50 THEN 'Average Performers'
-                ELSE 'Needs Improvement'
-            END as segment,
-            COUNT(*) as student_count,
-            AVG(s.total_score) as avg_score,
-            AVG(CASE WHEN sp.is_completed = 1 THEN 1 ELSE 0 END) * 100 as completion_rate,
-            AVG(CASE WHEN sqa.is_correct = 1 THEN 100 ELSE 0 END) as avg_quiz_score
-        FROM students s
-        LEFT JOIN student_progress sp ON s.id = sp.student_id
-        LEFT JOIN student_quiz_attempts sqa ON s.id = sqa.student_id
-        WHERE s.deleted_at IS NULL
-        GROUP BY segment
-        ORDER BY avg_score DESC";
+    CASE 
+        WHEN s.total_score >= 80 THEN 'High Achievers'
+        WHEN s.total_score >= 50 THEN 'Average Performers'
+        ELSE 'Needs Improvement'
+    END as segment,
+    COUNT(DISTINCT s.id) as student_count,
+    AVG(s.total_score) as avg_score,
+    AVG(sp.completion_status) * 100 as completion_rate,
+    AVG(sqa.avg_quiz_score) as avg_quiz_score
+FROM students s
+LEFT JOIN (
+    -- Subquery to get completion status per student (0 or 1)
+    SELECT 
+        student_id,
+        MAX(CASE WHEN is_completed = 1 THEN 1 ELSE 0 END) as completion_status
+    FROM student_progress
+    GROUP BY student_id
+) sp ON s.id = sp.student_id
+LEFT JOIN (
+    -- Subquery to get average quiz score per student
+    SELECT 
+        student_id,
+        AVG(CASE WHEN is_correct = 1 THEN 100 ELSE 0 END) as avg_quiz_score
+    FROM student_quiz_attempts
+    GROUP BY student_id
+) sqa ON s.id = sqa.student_id
+WHERE s.deleted_at IS NULL
+GROUP BY segment
+ORDER BY avg_score DESC;
+";
         
         $segments['performance'] = $conn->query($performance_query)->fetchAll(PDO::FETCH_ASSOC);
         
@@ -375,36 +390,46 @@ function getStudentSegmentAnalysis($conn) {
         
         $segments['engagement'] = $conn->query($engagement_query)->fetchAll(PDO::FETCH_ASSOC);
         
-        // Segment by progress pace
-        $pace_query = "SELECT 
-            s.id,
-            s.username,
-            COUNT(DISTINCT sp.lesson_id) as lessons_started,
-            COUNT(DISTINCT CASE WHEN sp.is_completed = 1 THEN sp.lesson_id END) as lessons_completed,
-            DATEDIFF(MAX(sp.last_accessed), MIN(sp.last_accessed)) as learning_duration,
-            CASE 
-                WHEN COUNT(DISTINCT sp.lesson_id) = 0 THEN 'Not Started'
-                WHEN COUNT(DISTINCT CASE WHEN sp.is_completed = 1 THEN sp.lesson_id END) / COUNT(DISTINCT sp.lesson_id) >= 0.8 THEN 'Fast Learner'
-                WHEN COUNT(DISTINCT CASE WHEN sp.is_completed = 1 THEN sp.lesson_id END) / COUNT(DISTINCT sp.lesson_id) >= 0.5 THEN 'Steady Pace'
-                ELSE 'Slow Progress'
-            END as pace_segment
-        FROM students s
-        LEFT JOIN student_progress sp ON s.id = sp.student_id
-        WHERE s.deleted_at IS NULL
-        GROUP BY s.id
-        HAVING lessons_started > 0";
-        
-        $pace_data = $conn->query($pace_query)->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Count segments
-        $pace_counts = ['Fast Learner' => 0, 'Steady Pace' => 0, 'Slow Progress' => 0, 'Not Started' => 0];
-        foreach ($pace_data as $student) {
-            if (isset($student['pace_segment'])) {
-                $pace_counts[$student['pace_segment']]++;
-            }
-        }
-        
-        $segments['pace'] = $pace_counts;
+       // Segment by progress pace
+$pace_query = "SELECT 
+    s.id,
+    s.username,
+    COUNT(DISTINCT sp.lesson_id) as lessons_started,
+    COUNT(DISTINCT CASE WHEN sp.is_completed = 1 THEN sp.lesson_id END) as lessons_completed,
+    DATEDIFF(MAX(sp.last_accessed), MIN(sp.last_accessed)) as learning_duration,
+    CASE 
+        WHEN COUNT(DISTINCT sp.lesson_id) = 0 THEN 'Not Started'
+        WHEN COUNT(DISTINCT CASE WHEN sp.is_completed = 1 THEN sp.lesson_id END) / COUNT(DISTINCT sp.lesson_id) >= 0.8 THEN 'Fast Learner'
+        WHEN COUNT(DISTINCT CASE WHEN sp.is_completed = 1 THEN sp.lesson_id END) / COUNT(DISTINCT sp.lesson_id) >= 0.5 THEN 'Steady Pace'
+        ELSE 'Slow Progress'
+    END as pace_segment
+FROM students s
+LEFT JOIN student_progress sp ON s.id = sp.student_id
+WHERE s.deleted_at IS NULL
+GROUP BY s.id
+ORDER BY s.id";
+
+$pace_data = $conn->query($pace_query)->fetchAll(PDO::FETCH_ASSOC);
+
+// Count segments
+$pace_counts = ['Fast Learner' => 0, 'Steady Pace' => 0, 'Slow Progress' => 0, 'Not Started' => 0];
+foreach ($pace_data as $student) {
+    if (isset($student['pace_segment'])) {
+        $pace_counts[$student['pace_segment']]++;
+    }
+}
+
+// Optional: Debug to see which students are missing
+$total_students = count($pace_data);
+echo "<!-- Total students in pace query: $total_students -->";
+
+// Debug: Check which students are 'Not Started'
+$not_started_students = array_filter($pace_data, function($s) {
+    return $s['pace_segment'] == 'Not Started';
+});
+echo "<!-- Not started students: " . json_encode(array_column($not_started_students, 'username')) . " -->";
+
+$segments['pace'] = $pace_counts;
         
         return $segments;
         

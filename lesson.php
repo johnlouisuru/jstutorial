@@ -121,7 +121,7 @@ $studentData = $studentSession->getStudentData();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/x-icon" href="assets/img/URUScript.png">
-    <title><?php echo htmlspecialchars($lesson['lesson_title'] ?? 'Lesson'); ?> - URUScript</title>
+    <title><?php echo htmlspecialchars($lesson['lesson_title'] ?? 'Lesson'); ?> - JSLab</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Add after your existing CSS links -->
@@ -638,7 +638,7 @@ $studentData = $studentSession->getStudentData();
         <div class="container">
             <a class="navbar-brand fw-bold text-primary" href="index">
                 <!-- <i class="fab fa-js-square me-2"></i>JS Tutorial -->
-                <img src="assets/img/URUScript.png" alt="JS Tutorial Logo" width="40" height="40"> URUScript
+                <img src="assets/img/URUScript.png" alt="JS Tutorial Logo" width="40" height="40"> JSLab
             </a>
             <div class="d-flex align-items-center">
                 <?php if ($studentSession->isLoggedIn() && $studentData): ?>
@@ -849,7 +849,7 @@ $studentData = $studentSession->getStudentData();
                         <!-- Interactive Code Runner -->
 <div class="code-runner">
     <div class="code-runner-header">
-        <span><i class="fas fa-code me-2"></i>URUScript Arena</span>
+        <span><i class="fas fa-code me-2"></i>JSLab Arena</span>
         <div>
             <button class="btn btn-sm btn-outline-light me-2" onclick="resetCode()">
                 <i class="fas fa-redo me-1"></i> Reset
@@ -863,7 +863,7 @@ $studentData = $studentSession->getStudentData();
         <textarea id="codeEditor" placeholder="Write or modify the JavaScript code here...">
 <?php
 // Get the lesson_code_run from database, with better fallback
-$default_code = '// Welcome to URUScript Arena!
+$default_code = '// Welcome to JSLab Arena!
 // This is where you can practice JavaScript code.
 console.log("Hello, JavaScript Learner!");';
 
@@ -1167,7 +1167,7 @@ echo $lesson_code;
         <div class="container">
             <div class="row">
                 <div class="col-md-6">
-                    <img src="assets/img/URUScript.png" alt="URUScript Tutorial Logo" title="URUScript Tutorial Logo" class="img-fluid" style="max-height: 50px;"> URUScript Tutorial Platform
+                    <img src="assets/img/URUScript.png" alt="JSLab Tutorial Logo" title="JSLab Tutorial Logo" class="img-fluid" style="max-height: 50px;"> JSLab Tutorial Platform
                     <!-- <h5><i class="fab fa-js-square me-2"></i>JavaScript Tutorial</h5> -->
                     <p class="text-muted">An interactive learning platform for mastering JavaScript</p>
                 </div>

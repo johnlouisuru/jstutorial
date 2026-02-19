@@ -18,7 +18,7 @@ $username = $studentSession->getStudentData()['username'];
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/x-icon" href="assets/img/URUScript.png">
-    <title>URUScript Practice Area | Interactive Learning Platform</title>
+    <title>JSLab Practice Area | Interactive Learning Platform</title>
     
     <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -458,7 +458,7 @@ $username = $studentSession->getStudentData()['username'];
         <div class="container-fluid">
             <a class="navbar-brand" href="#">
                 <!-- <i class="fab fa-js-square me-2"></i>URUScript Practice Area -->
-                <img src="assets/img/URUScript.png" alt="URUScript Logo" width="40" height="40" class="me-2">URUScript Practice Area
+                <img src="assets/img/URUScript.png" alt="JSLab Logo" width="40" height="40" class="me-2">JSLab Practice Area
             </a>
             <button class="sidebar-toggle" id="sidebarToggle">
                 <i class="fas fa-bars"></i>
@@ -479,7 +479,7 @@ $username = $studentSession->getStudentData()['username'];
             <div class="sidebar-content">
                 <!-- Files Section -->
                 <h6 class="mb-3">
-                    <i class="fas fa-folder me-2"></i>My URUScript Files
+                    <i class="fas fa-folder me-2"></i>My JSLab Files
                 </h6>
                 <div id="fileList" class="mb-4">
                     <div class="text-muted small">No saved files yet</div>
@@ -490,7 +490,7 @@ $username = $studentSession->getStudentData()['username'];
                 
                 <!-- JavaScript Examples -->
                 <h6 class="mb-3">
-                    <i class="fas fa-code me-2"></i>URUScript Examples
+                    <i class="fas fa-code me-2"></i>JSLab Examples
                 </h6>
                 <div id="exampleList" class="mb-4">
                     <div class="sidebar-item" onclick="loadExample('hello-world')">
@@ -538,7 +538,7 @@ $username = $studentSession->getStudentData()['username'];
     <!-- Mobile first row -->
     <div class="d-flex align-items-center w-100 mb-2 mb-md-0">
         <span class="text-white d-none d-md-inline">
-            <i class="fab fa-js me-2"></i>URUScript Editor
+            <i class="fab fa-js me-2"></i>JSLab Editor
         </span>
         
         <div class="input-group input-group-sm ms-auto" style="max-width: 250px;">
@@ -601,7 +601,7 @@ $username = $studentSession->getStudentData()['username'];
                     </button>
                 </div>
                 <div class="output-content" id="consoleOutput">
-URUScript output will appear here...
+JSLab output will appear here...
                 </div>
             </div>
             

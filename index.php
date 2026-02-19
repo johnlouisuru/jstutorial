@@ -153,7 +153,7 @@ $studentData = $studentSession->getStudentData();
         <div class="container">
             <a class="navbar-brand fw-bold text-primary" href="#">
                 <!-- <i class="fab fa-js-square me-2"></i>JS Tutorial -->
-                <img src="assets/img/URUScript.png" alt="JS Tutorial Logo" width="40" height="40"> URUScript
+                <img src="assets/img/URUScript.png" alt="JS Tutorial Logo" width="40" height="40"> JSLab
             </a>
             <div class="d-flex align-items-center">
                 <?php if ($studentSession->isLoggedIn() && $studentData): ?>
@@ -243,7 +243,7 @@ $studentData = $studentSession->getStudentData();
                 </div>
                 <div class="col-lg-4 text-center">
                     <!-- <i class="fab fa-js-square display-1 opacity-75"></i> -->
-                    <img src="assets/img/URUScript.png" alt="URUScript Tutorial Logo" title="URUScript Tutorial Logo" class="img-fluid" style="max-height: 150px;">
+                    <img src="assets/img/URUScript.png" alt="JSLab Tutorial Logo" title="JSLab Tutorial Logo" class="img-fluid" style="max-height: 150px;">
                 </div>
             </div>
         </div>
@@ -464,12 +464,12 @@ $studentData = $studentSession->getStudentData();
         <div class="container">
             <div class="row">
                 <div class="col-md-6">
-                    <img src="assets/img/URUScript.png" alt="URUScript Tutorial Logo" title="URUScript Tutorial Logo" class="img-fluid" style="max-height: 50px;">&nbsp <a href="https://www.github.com/johnlouisuru">URUScript Tutorial Platform</a> 
+                    <img src="assets/img/URUScript.png" alt="JSLab Tutorial Logo" title="JSLab Tutorial Logo" class="img-fluid" style="max-height: 50px;">&nbsp <a href="https://www.github.com/johnlouisuru">JSLab Tutorial Platform</a> 
                     
                     <p class="text-white">An interactive learning platform for mastering JavaScript</p>
                 </div>
                 <div class="col-md-6 text-md-end">
-                    <p class="text-white mb-0">&copy; 2026 URUScript Tutorial. All rights reserved.</p>
+                    <p class="text-white mb-0">&copy; 2026 JSLab Tutorial. All rights reserved.</p>
                 </div>
             </div>
         </div>
